@@ -49,7 +49,9 @@ From Claude Design, direction "Timetable" (canvas "Daniel Butnar portfolio", pag
 ## Firebase
 
 - `app/firebase/web-config.json` is `null` until the project exists; then the form sends. Rules,
-  indexes and the TTL policy deploy with `npx firebase deploy --only firestore --project <id>`.
+  indexes deploy with `npx firebase deploy --only firestore --project <id>`. The project is on the
+  free Spark plan (owner's choice, 2026-09-27): no TTL policy, so `/admin` deletes inquiries and
+  notes past `expireAt` when it opens.
 - Owner = `OWNER_EMAIL` in `app/firebase/owner.ts`, the same address in `firestore.rules`
   (a unit test keeps them equal). Verified Google sign-in only.
 - Limits live in `app/inquiry/schema.ts`; the rules tests import them. Change both files together.

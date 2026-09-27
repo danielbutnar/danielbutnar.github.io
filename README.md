@@ -14,7 +14,7 @@ It is also a working React and Firebase app. The case study
   - a private inbox at `/admin` with **Google sign-in**, owner only.
 - **Security rules are the backend** (`firestore.rules`): exact fields, types and lengths, the
   sender's own ID, server timestamps, a one-inquiry-per-minute limit built from a batched write and
-  `getAfter()`, and a 12-month time-to-live.
+  `getAfter()`, and a deletion date a year ahead, which the inbox enforces.
 - **Firebase loads only when needed**: the home page ships about 130 KB of JavaScript (gzip) and no
   Firebase code; the SDK arrives with a dynamic `import()` when someone presses Send.
 - **A Content Security Policy per page**, computed at build time from the page's own inline scripts.
@@ -24,7 +24,7 @@ It is also a working React and Firebase app. The case study
 | Command                           | What it runs                                                                                                                                    |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm test`                       | 65 unit tests: validation, locale paths, dictionaries, content integrity                                                                        |
-| `pnpm test:rules`                 | 27 security-rule tests against the Firestore emulator                                                                                           |
+| `pnpm test:rules`                 | 29 security-rule tests against the Firestore emulator                                                                                           |
 | `pnpm build:e2e && pnpm test:e2e` | The inquiry flow in Chrome against the Auth and Firestore emulators: send, validate, rate limit, a stranger refused, owner sign-in, live status |
 | `pnpm check`                      | typecheck, lint and unit tests                                                                                                                  |
 
@@ -63,7 +63,8 @@ Until `app/firebase/web-config.json` holds a config, the form offers e-mail inst
 3. Authentication: enable the **Anonymous** and **Google** providers, and add
    `danielbutnar.github.io` to the authorized domains.
 4. `npx firebase login`, then `npx firebase deploy --only firestore --project <project-id>`: this
-   deploys the rules and the time-to-live policy on `expireAt`.
+   deploys the rules. (Firestore's time-to-live deletion needs the Blaze plan; on Spark the
+   inbox deletes expired inquiries when it opens.)
 
 ## Credits
 

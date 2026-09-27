@@ -27,9 +27,9 @@ service cloud.firestore {
               "replyLang", "uid", "status", "createdAt", "expireAt"];
     }
 
-    // Kept for a year, then removed by the TTL policy on `expireAt`
-    // (firestore.indexes.json). The client sets it from its own clock, so the
-    // rule accepts a day either way.
+    // Kept for a year: the owner's inbox deletes inquiries past `expireAt` when it
+    // opens (the free Spark plan has no TTL policy). The client sets the date from
+    // its own clock, so the rule accepts a day either way.
     function expiresInAYear(value) {
       return value is timestamp
         && value > request.time + duration.value(364, "d")

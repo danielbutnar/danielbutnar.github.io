@@ -11,9 +11,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
   type Firestore,
 } from "firebase/firestore";
@@ -288,6 +290,41 @@ describe("the owner's inbox", () => {
       updateDoc(doc(visitor("visitor-1"), "inquiries", "mine"), { status: "read" }),
     );
     await assertFails(deleteDoc(doc(visitor("visitor-1"), "inquiries", "mine")));
+  });
+
+  it("lets the owner find expired inquiries and delete them with their notes in one batch", async () => {
+    await seed("old", "visitor-1", { expireAt: Timestamp.fromMillis(Date.now() - DAY_MS) });
+    await seed("fresh");
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore() as unknown as Firestore;
+      await setDoc(
+        doc(db, "inquiries", "old"),
+        { expireAt: Timestamp.fromMillis(Date.now() - DAY_MS) },
+        { merge: true },
+      );
+      await setDoc(doc(db, "notes", "old"), {
+        text: "Old",
+        updatedAt: Timestamp.now(),
+        expireAt: Timestamp.now(),
+      });
+    });
+    const db = owner();
+    const expired = await assertSucceeds(
+      getDocs(query(collection(db, "inquiries"), where("expireAt", "<", Timestamp.now()))),
+    );
+    expect(expired.docs.map((d) => d.id)).toEqual(["old"]);
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "inquiries", "old"));
+    batch.delete(doc(db, "notes", "old"));
+    await assertSucceeds(batch.commit());
+    expect((await getDocs(collection(db, "inquiries"))).docs.map((d) => d.id)).toEqual(["fresh"]);
+  });
+
+  it("does not let visitors query for expired inquiries", async () => {
+    await seed("old");
+    await assertFails(
+      getDocs(query(collection(visitor(), "inquiries"), where("expireAt", "<", Timestamp.now()))),
+    );
   });
 
   it("lets the owner delete an inquiry", async () => {

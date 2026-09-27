@@ -7,17 +7,19 @@ import {
   type User,
 } from "firebase/auth";
 import {
+  Timestamp,
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
-  type Timestamp,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { getFirebase } from "~/firebase/client";
@@ -145,6 +147,26 @@ function Inbox() {
   const [filter, setFilter] = useState<InquiryStatus | "all">("new");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [cleaned, setCleaned] = useState(0);
+
+  // The free Spark plan has no time-to-live deletion, so the inbox does it: every
+  // inquiry past its expireAt goes, with its note, as soon as the inbox opens.
+  useEffect(() => {
+    const { db } = getFirebase();
+    (async () => {
+      const expired = await getDocs(
+        query(collection(db, "inquiries"), where("expireAt", "<", Timestamp.now())),
+      );
+      if (expired.empty) return;
+      const batch = writeBatch(db);
+      for (const inquiry of expired.docs) {
+        batch.delete(inquiry.ref);
+        batch.delete(doc(db, "notes", inquiry.id));
+      }
+      await batch.commit();
+      setCleaned(expired.size);
+    })().catch(() => setFailed(true));
+  }, []);
 
   useEffect(() => {
     const { db } = getFirebase();
@@ -192,58 +214,66 @@ function Inbox() {
   if (!rows) return <p className="admin__message">Loading inquiries…</p>;
 
   return (
-    <div className="admin__grid">
-      <section className="admin__list" aria-label="Inquiries">
-        <div className="admin__filters" role="group" aria-label="Show">
-          {FILTERS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={filter === option.id}
-              onClick={() => setFilter(option.id)}
-            >
-              {option.label} ({counts[option.id] ?? 0})
-            </button>
-          ))}
-        </div>
-        {visible.length === 0 ? (
-          <p className="admin__empty">
-            {filter === "new"
-              ? "No new inquiries. New ones appear here without a reload."
-              : "Nothing here."}
-          </p>
-        ) : (
-          <ul>
-            {visible.map((row) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  className="admin__item"
-                  aria-current={row.id === selectedId ? "true" : undefined}
-                  onClick={() => open(row)}
-                >
-                  <span className="admin__item-top">
-                    <strong>{row.company || row.name}</strong>
-                    <span>{row.createdAt ? ago(row.createdAt.toDate()) : ""}</span>
-                  </span>
-                  <span className="admin__kind">
-                    {dictionaries.en.contact.kinds[row.kind]}
-                    {row.status === "new" ? <span className="admin__new">New</span> : null}
-                  </span>
-                  <span className="admin__preview">{row.message}</span>
-                </button>
-              </li>
+    <>
+      {cleaned > 0 ? (
+        <p className="admin__message" role="status">
+          Deleted {cleaned} {cleaned === 1 ? "inquiry" : "inquiries"} older than 12 months, with
+          their notes.
+        </p>
+      ) : null}
+      <div className="admin__grid">
+        <section className="admin__list" aria-label="Inquiries">
+          <div className="admin__filters" role="group" aria-label="Show">
+            {FILTERS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={filter === option.id}
+                onClick={() => setFilter(option.id)}
+              >
+                {option.label} ({counts[option.id] ?? 0})
+              </button>
             ))}
-          </ul>
-        )}
-      </section>
+          </div>
+          {visible.length === 0 ? (
+            <p className="admin__empty">
+              {filter === "new"
+                ? "No new inquiries. New ones appear here without a reload."
+                : "Nothing here."}
+            </p>
+          ) : (
+            <ul>
+              {visible.map((row) => (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    className="admin__item"
+                    aria-current={row.id === selectedId ? "true" : undefined}
+                    onClick={() => open(row)}
+                  >
+                    <span className="admin__item-top">
+                      <strong>{row.company || row.name}</strong>
+                      <span>{row.createdAt ? ago(row.createdAt.toDate()) : ""}</span>
+                    </span>
+                    <span className="admin__kind">
+                      {dictionaries.en.contact.kinds[row.kind]}
+                      {row.status === "new" ? <span className="admin__new">New</span> : null}
+                    </span>
+                    <span className="admin__preview">{row.message}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      {selected ? (
-        <Detail key={selected.id} row={selected} onDeleted={() => setSelectedId(null)} />
-      ) : (
-        <p className="admin__message">Pick an inquiry on the left.</p>
-      )}
-    </div>
+        {selected ? (
+          <Detail key={selected.id} row={selected} onDeleted={() => setSelectedId(null)} />
+        ) : (
+          <p className="admin__message">Pick an inquiry on the left.</p>
+        )}
+      </div>
+    </>
   );
 }
 

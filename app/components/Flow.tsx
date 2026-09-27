@@ -32,7 +32,7 @@ const TEXT: Record<Locale, FlowText> = {
       ],
       [
         "Firestore, in the EU",
-        "Kept for 12 months, then deleted by a time-to-live policy. Nobody has to remember.",
+        "Each inquiry carries a deletion date a year ahead. My inbox deletes it once that date has passed.",
       ],
     ],
     fork: [
@@ -63,7 +63,7 @@ const TEXT: Record<Locale, FlowText> = {
       ],
       [
         "Firestore, in der EU",
-        "12 Monate gespeichert, dann per Time-to-live-Regel gelöscht. Niemand muss daran denken.",
+        "Jede Anfrage trägt ein Löschdatum ein Jahr voraus. Danach löscht mein Posteingang sie.",
       ],
     ],
     fork: [
@@ -97,7 +97,7 @@ const TEXT: Record<Locale, FlowText> = {
       ],
       [
         "Firestore, în UE",
-        "Păstrată 12 luni, apoi ștearsă de o regulă time-to-live. Nu trebuie să țină nimeni minte.",
+        "Fiecare cerere are o dată de ștergere peste un an. După ea, căsuța mea o șterge.",
       ],
     ],
     fork: [

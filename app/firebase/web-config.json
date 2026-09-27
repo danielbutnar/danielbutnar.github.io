@@ -1,1 +1,8 @@
-null
+{
+  "apiKey": "AIzaSyCKNNB6LRlBMr0cdcBwnYMCCmMohKMIBwo",
+  "authDomain": "danielbutnar-portfolio.firebaseapp.com",
+  "projectId": "danielbutnar-portfolio",
+  "storageBucket": "danielbutnar-portfolio.firebasestorage.app",
+  "messagingSenderId": "217361342304",
+  "appId": "1:217361342304:web:e67b9ce9fd2921c97c8805"
+}

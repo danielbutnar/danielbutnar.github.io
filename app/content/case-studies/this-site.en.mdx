@@ -14,7 +14,7 @@ The design came first, in Claude Design: three directions, then every page for d
 - An inquiry form that changes with what you ask about (a project, a job, something else), checks every field as you type, and stores the inquiry in Cloud Firestore.
 - A status page that updates live when I open the inquiry and when I mark it answered.
 - A private inbox at /admin: Google sign-in, owner only, a live list with filters, statuses, private notes and delete.
-- Security rules with 27 tests against the Firestore emulator, 65 unit tests, and an end-to-end test in Chrome against the Auth and Firestore emulators. CI runs all three on every push.
+- Security rules with 29 tests against the Firestore emulator, 65 unit tests, and an end-to-end test in Chrome against the Auth and Firestore emulators. CI runs all three on every push.
 
 <Flow />
 
@@ -72,15 +72,17 @@ The Firebase SDK is the largest dependency on the site, and most visitors never 
 
 The home page ships about 130 KB of JavaScript, compressed, and no Firebase code at all. Pressing Send adds about 155 KB. The inbox, which needs Google sign-in, is a separate route that visitors never load. Fonts are self-hosted, and only their Latin subsets, which cover English, German and Romanian.
 
-### Data that deletes itself
+### Data with an expiry date
 
-The privacy notice promises that an inquiry is deleted after 12 months, and a promise like that is easy to forget. So every inquiry carries an `expireAt` date, and a Firestore time-to-live policy deletes the document when that date passes. The client sets the date from its own clock, so the rule accepts it within a day either way. My private notes on an inquiry copy its `expireAt`, and the rules check that they match, so a note cannot outlive its inquiry.
+The privacy notice promises that an inquiry is deleted after 12 months, and a promise like that is easy to forget. So every inquiry carries an `expireAt` date a year ahead, and the rules refuse any other date. The client sets it from its own clock, so the rule accepts it within a day either way.
+
+Firestore's time-to-live policy would delete such documents by itself, but it needs the paid Blaze plan, and this site runs on the free one. So the inbox does it: each time I open it, it queries every inquiry past its date and deletes it together with my note on it, in one batch. My notes copy their inquiry's `expireAt`, and the rules check that they match, so a note cannot outlive its inquiry.
 
 </Section>
 
 <Section id="results">
 
-- 27 security-rule tests pass against the Firestore emulator, and 65 unit tests pass (27 September 2026).
+- 29 security-rule tests pass against the Firestore emulator, and 65 unit tests pass (27 September 2026).
 - The end-to-end test passes all 12 checks: sending, validation, the rate limit, a stranger's browser refused, the owner's sign-in, and the status page changing live (27 September 2026).
 - 30 pages prerendered in three languages, with no horizontal scroll at 375 px and no console errors.
 - Home page: about 130 KB of JavaScript, compressed, with no Firebase code.
@@ -90,7 +92,7 @@ The privacy notice promises that an inquiry is deleted after 12 months, and a pr
 <Section id="next">
 
 - Add App Check with reCAPTCHA Enterprise, so only this site can write to Firestore.
-- Send me an e-mail for each new inquiry. That needs a Cloud Function, which needs the paid Blaze plan.
+- On the Blaze plan: let Firestore's time-to-live policy delete old inquiries, and send me an e-mail for each new one from a Cloud Function.
 - Send inquiries with Firestore Lite, which is much smaller, and keep the full SDK only for the pages that update live.
 
 </Section>

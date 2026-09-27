@@ -14,7 +14,7 @@ Zuerst kam das Design, in Claude Design: drei Richtungen, dann jede Seite für D
 - Ein Anfrageformular, das sich an das Thema anpasst (ein Projekt, eine Stelle, etwas anderes), jedes Feld beim Tippen prüft und die Anfrage in Cloud Firestore speichert.
 - Eine Statusseite, die sich live aktualisiert, wenn ich die Anfrage öffne und als beantwortet markiere.
 - Ein privater Posteingang unter /admin: Google-Anmeldung, nur für mich, eine Live-Liste mit Filtern, Status, privaten Notizen und Löschen.
-- 27 Tests der Security Rules gegen den Firestore-Emulator, 65 Unit-Tests und ein End-to-End-Test in Chrome gegen die Auth- und Firestore-Emulatoren. Die CI führt alle drei bei jedem Push aus.
+- 29 Tests der Security Rules gegen den Firestore-Emulator, 65 Unit-Tests und ein End-to-End-Test in Chrome gegen die Auth- und Firestore-Emulatoren. Die CI führt alle drei bei jedem Push aus.
 
 <Flow />
 
@@ -72,15 +72,17 @@ Das Firebase-SDK ist die größte Abhängigkeit der Website, und die meisten Bes
 
 Die Startseite liefert etwa 130 KB JavaScript aus, komprimiert, und keinen Firebase-Code. Senden lädt etwa 155 KB nach. Der Posteingang, der die Google-Anmeldung braucht, ist eine eigene Route, die Besucher nie laden. Die Schriften liegen auf der Website selbst, und nur ihre lateinischen Teilmengen, die Englisch, Deutsch und Rumänisch abdecken.
 
-### Daten, die sich selbst löschen
+### Daten mit Ablaufdatum
 
-Die Datenschutzerklärung verspricht, dass eine Anfrage nach 12 Monaten gelöscht wird, und so ein Versprechen vergisst man leicht. Deshalb trägt jede Anfrage ein `expireAt`-Datum, und eine Time-to-live-Regel in Firestore löscht das Dokument, wenn das Datum erreicht ist. Der Browser setzt das Datum nach seiner eigenen Uhr, deshalb akzeptiert die Regel einen Tag Abweichung in jede Richtung. Meine privaten Notizen zu einer Anfrage übernehmen deren `expireAt`, und die Rules prüfen, dass beide übereinstimmen. So kann keine Notiz ihre Anfrage überleben.
+Die Datenschutzerklärung verspricht, dass eine Anfrage nach 12 Monaten gelöscht wird, und so ein Versprechen vergisst man leicht. Deshalb trägt jede Anfrage ein `expireAt`-Datum ein Jahr voraus, und die Rules lehnen jedes andere Datum ab. Der Browser setzt es nach seiner eigenen Uhr, deshalb akzeptiert die Regel einen Tag Abweichung in jede Richtung.
+
+Die Time-to-live-Regel von Firestore würde solche Dokumente selbst löschen, braucht aber den kostenpflichtigen Blaze-Tarif, und diese Website läuft auf dem kostenlosen. Also übernimmt es der Posteingang: Jedes Mal, wenn ich ihn öffne, fragt er alle Anfragen ab, deren Datum vorbei ist, und löscht sie zusammen mit meiner Notiz in einem Batch. Meine Notizen übernehmen das `expireAt` ihrer Anfrage, und die Rules prüfen, dass beide übereinstimmen. So kann keine Notiz ihre Anfrage überleben.
 
 </Section>
 
 <Section id="results">
 
-- 27 Tests der Security Rules bestehen gegen den Firestore-Emulator, dazu 65 Unit-Tests (27. September 2026).
+- 29 Tests der Security Rules bestehen gegen den Firestore-Emulator, dazu 65 Unit-Tests (27. September 2026).
 - Der End-to-End-Test besteht alle 12 Prüfungen: Senden, Validierung, das Rate Limit, ein fremder Browser ohne Zugriff, die Anmeldung des Inhabers und die Statusseite, die sich live ändert (27. September 2026).
 - 30 vorgerenderte Seiten in drei Sprachen, ohne horizontales Scrollen bei 375 px und ohne Konsolenfehler.
 - Startseite: etwa 130 KB JavaScript, komprimiert, ohne Firebase-Code.
@@ -90,7 +92,7 @@ Die Datenschutzerklärung verspricht, dass eine Anfrage nach 12 Monaten gelösch
 <Section id="next">
 
 - App Check mit reCAPTCHA Enterprise einführen, damit nur diese Website in Firestore schreiben kann.
-- Mir für jede neue Anfrage eine E-Mail schicken. Dafür braucht es eine Cloud Function und damit den kostenpflichtigen Blaze-Tarif.
+- Im Blaze-Tarif: alte Anfragen per Time-to-live-Regel von Firestore löschen lassen und mir für jede neue Anfrage eine E-Mail aus einer Cloud Function schicken.
 - Anfragen mit Firestore Lite senden, das deutlich kleiner ist, und das volle SDK nur auf den Seiten laden, die sich live aktualisieren.
 
 </Section>

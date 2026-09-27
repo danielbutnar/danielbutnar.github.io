@@ -86,5 +86,5 @@ jobs:
       - run: pnpm install --frozen-lockfile --dir site-qa
       - name: site-check on the live site
         run: |
-          sleep 30
+          sleep 60 # Pages can answer 503 for a moment right after a deploy.
           node site-qa/site-check.mjs --base https://danielbutnar.github.io/ --out "$RUNNER_TEMP/site-check" --no-shots

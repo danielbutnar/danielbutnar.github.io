@@ -14,7 +14,7 @@ Aplic la posturi cu React și Firebase și iau proiecte mici pentru firme. Un po
 - Un formular de cerere care se schimbă după subiect (un proiect, un post, altceva), verifică fiecare câmp pe măsură ce scrieți și salvează cererea în Cloud Firestore.
 - O pagină de status care se actualizează live când deschid cererea și când o marchez ca răspunsă.
 - O căsuță privată la /admin: autentificare Google, doar pentru mine, o listă live cu filtre, statusuri, notițe private și ștergere.
-- 27 de teste pentru regulile de securitate pe emulatorul Firestore, 65 de teste unitare și un test end-to-end în Chrome pe emulatoarele Auth și Firestore. CI-ul le rulează pe toate trei la fiecare push.
+- 29 de teste pentru regulile de securitate pe emulatorul Firestore, 65 de teste unitare și un test end-to-end în Chrome pe emulatoarele Auth și Firestore. CI-ul le rulează pe toate trei la fiecare push.
 
 <Flow />
 
@@ -72,15 +72,17 @@ SDK-ul Firebase e cea mai mare dependență a site-ului, iar majoritatea vizitat
 
 Pagina principală livrează circa 130 KB de JavaScript, comprimat, și niciun cod Firebase. Trimiterea mai adaugă circa 155 KB. Căsuța, care are nevoie de autentificarea Google, e o rută separată pe care vizitatorii nu o încarcă niciodată. Fonturile sunt găzduite pe site, doar subseturile latine, care acoperă engleza, germana și româna.
 
-### Date care se șterg singure
+### Date cu termen de expirare
 
-Politica de confidențialitate promite că o cerere se șterge după 12 luni, iar o asemenea promisiune se uită ușor. Așa că fiecare cerere are o dată `expireAt`, iar o regulă time-to-live din Firestore șterge documentul când data trece. Browserul pune data după propriul ceas, deci regula acceptă o zi abatere în orice sens. Notițele mele private despre o cerere preiau `expireAt` al ei, iar regulile verifică să coincidă, ca nicio notiță să nu trăiască mai mult decât cererea.
+Politica de confidențialitate promite că o cerere se șterge după 12 luni, iar o asemenea promisiune se uită ușor. Așa că fiecare cerere are o dată `expireAt` peste un an, iar regulile refuză orice altă dată. Browserul o pune după propriul ceas, deci regula acceptă o zi abatere în orice sens.
+
+Regula time-to-live din Firestore ar șterge singură asemenea documente, dar are nevoie de planul plătit Blaze, iar site-ul rulează pe cel gratuit. Așa că se ocupă căsuța: de fiecare dată când o deschid, caută toate cererile al căror termen a trecut și le șterge împreună cu notița mea, într-un singur lot. Notițele mele preiau `expireAt` al cererii, iar regulile verifică să coincidă, ca nicio notiță să nu trăiască mai mult decât cererea.
 
 </Section>
 
 <Section id="results">
 
-- 27 de teste pentru regulile de securitate trec pe emulatorul Firestore, plus 65 de teste unitare (27 septembrie 2026).
+- 29 de teste pentru regulile de securitate trec pe emulatorul Firestore, plus 65 de teste unitare (27 septembrie 2026).
 - Testul end-to-end trece toate cele 12 verificări: trimiterea, validarea, limita de trimitere, un browser străin refuzat, autentificarea proprietarului și pagina de status care se schimbă live (27 septembrie 2026).
 - 30 de pagini prerandate în trei limbi, fără derulare orizontală la 375 px și fără erori în consolă.
 - Pagina principală: circa 130 KB de JavaScript, comprimat, fără cod Firebase.
@@ -90,7 +92,7 @@ Politica de confidențialitate promite că o cerere se șterge după 12 luni, ia
 <Section id="next">
 
 - App Check cu reCAPTCHA Enterprise, ca doar acest site să poată scrie în Firestore.
-- Un e-mail către mine pentru fiecare cerere nouă. Pentru asta e nevoie de o Cloud Function, deci de planul plătit Blaze.
+- Pe planul Blaze: ștergerea cererilor vechi prin regula time-to-live din Firestore și un e-mail către mine pentru fiecare cerere nouă, dintr-o Cloud Function.
 - Trimiterea cererilor cu Firestore Lite, mult mai mic, și SDK-ul complet doar pe paginile care se actualizează live.
 
 </Section>
