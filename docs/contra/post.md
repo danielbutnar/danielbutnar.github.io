@@ -1,6 +1,6 @@
 # Contra post: Portfolio on React and Firebase
 
-Images in this folder, in order. 01 is the cover.
+Images in this folder, in order. The cover is 00-cover-4x3.jpg (Contra wants 4:3); 01 to 09 go in the gallery.
 
 ## Title
 
