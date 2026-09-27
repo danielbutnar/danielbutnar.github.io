@@ -43,6 +43,35 @@ const visible = (locator, timeout = 20_000) =>
     .catch(() => false);
 
 try {
+  // Case studies open from the work list without a full page load, in every language.
+  const reader = await (await newContext()).newPage();
+  const failedRequests = [];
+  reader.on("response", (response) => {
+    if (response.status() >= 400) failedRequests.push(`${response.status()} ${response.url()}`);
+  });
+  for (const [home, project, heading] of [
+    ["/", "Brasov Private Tours", "The hard parts"],
+    ["/de/", "Diese Website", "Die schwierigen Stellen"],
+    ["/ro/", "Ursa", "Părțile grele"],
+  ]) {
+    await reader.goto(`${base}${home}`, { waitUntil: "networkidle" });
+    await reader.getByRole("link", { name: project, exact: true }).first().click();
+    const opened =
+      (await visible(reader.getByRole("heading", { level: 1, name: project }))) &&
+      (await visible(reader.getByRole("heading", { level: 2, name: heading })));
+    check(`a click opens the case study: ${home} ${project}`, opened);
+  }
+  await reader.getByRole("link", { name: /Următorul studiu de caz/ }).click();
+  check(
+    "the next case study opens from the link at the bottom",
+    await visible(reader.getByRole("heading", { level: 1, name: "Accessibility study" })),
+  );
+  check(
+    "no failed requests while reading",
+    failedRequests.length === 0,
+    failedRequests.join(" | "),
+  );
+
   // A visitor sends a project inquiry and lands on the status page.
   const visitor = await (await newContext()).newPage();
   const errors = [];

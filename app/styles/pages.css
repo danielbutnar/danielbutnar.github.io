@@ -221,6 +221,20 @@
   margin-block: 0.5rem;
 }
 
+/* Results read like the work table: ruled rows, no bullets. */
+.prose #results ul {
+  padding-left: 0;
+  list-style: none;
+  gap: 0;
+  border-top: 3px solid var(--ink);
+}
+
+.prose #results li {
+  padding-block: 0.875rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+}
+
 .prose .results {
   display: grid;
   grid-template-columns: 12.5rem minmax(0, 1fr);

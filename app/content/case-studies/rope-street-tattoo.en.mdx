@@ -1,6 +1,6 @@
 <Section id="job">
 
-The Contra × Lovable challenge asked entrants to turn "can I book with you?" into "you're booked". I invented the client and wrote the brief myself: Rope Street Tattoo, a one-chair studio in Brașov's old town, where one artist, Mara, does everything.
+The Contra × Lovable challenge asked entrants to turn “can I book with you?” into “you’re booked”. I invented the client and wrote the brief myself: Rope Street Tattoo, a one-chair studio in Brașov’s old town, where one artist, Mara, does everything.
 
 In the brief she wears gloves six to seven hours a day, so messages wait until night. Every quote needs size, placement, colour and a reference. Sessions run from 45 minutes to 5 hours, so one-hour slots do not work. Cover-ups, hands, necks and faces must never book themselves. About a third of clients are tourists who write in English, German or Romanian and stay two or three days.
 
@@ -8,15 +8,15 @@ In the brief she wears gloves six to seven hours a day, so messages wait until n
 
 <Section id="built">
 
-I wrote the brief, the studio's rules, twelve prompts and a check for each one. Lovable generated the app from them. The tooling that films and voices the demo video is my own code.
+I wrote the brief, the studio’s rules, twelve prompts and a check for each one. Lovable generated the app from them. The tooling that films and voices the demo video is my own code.
 
 - A front door: describe the idea in your own words and language, get a duration, a price range, a deposit and only the times that fit the job.
-- A Stripe deposit in test mode. Once paid, the dashed violet "stencil" booking card turns to solid ink.
+- A Stripe deposit in test mode. Once paid, the dashed violet “stencil” booking card turns to solid ink.
 - A private page per booking to confirm, move, cancel, add to a calendar and sign the consent form, without an account.
-- An owner area with Today, Week and a "Needs you" queue, where a pasted DM becomes a priced reply in the customer's language.
+- An owner area with Today, Week and a “Needs you” queue, where a pasted DM becomes a priced reply in the customer’s language.
 - An autopilot for confirmations, nudges, releases, waitlist refills and aftercare, with a demo clock to fast-forward it.
 
-<Shot name="rope-street-tattoo-price" kind="desktop" alt="The estimate for a German message: a 90-minute session, 450 to 600 lei, and a 150 lei deposit." caption="The AI fills in the fields; the price comes from the studio's rules." />
+<Shot name="rope-street-tattoo-price" kind="desktop" alt="The estimate for a German message: a 90-minute session, 450 to 600 lei, and a 150 lei deposit." caption="The AI fills in the fields; the price comes from the studio’s rules." />
 
 </Section>
 
@@ -24,7 +24,7 @@ I wrote the brief, the studio's rules, twelve prompts and a check for each one. 
 
 ### The AI reads, the rules decide
 
-A price from a chatbot is a guess. For a tattoo, a wrong guess means an upset customer or a lost day's pay.
+A price from a chatbot is a guess. For a tattoo, a wrong guess means an upset customer or a lost day’s pay.
 
 So the AI only reads. Through tool calling it returns fields: language, placement, size, colour, detail, cover-up or not, dates in town, and a confidence score. Deterministic server code turns those fields into numbers, from rules Mara can edit: a size table from 45 minutes to 4 hours, extra time for colour, fine detail and harder placements, rounding up to 15 minutes, 350 lei an hour, and a range from 0.9 to 1.15 times the expected price. Cover-ups, hands, fingers, neck, face, anything over 25 cm, or a confidence below 0.6 go to Mara.
 
@@ -36,13 +36,13 @@ Judges cannot wait three days to see a reminder go out.
 
 Every server function asks one clock for the time, and in demo mode that clock is a stored timestamp. One runner handles everything due between its last run and the new time, in order: a confirmation request 72 hours before a session, a second nudge at 48, and at 24 hours an unconfirmed slot is released, the deposit kept, and the time offered to the three best matches on the waitlist. Each action has a dedupe key, and messages are unique per booking and kind, so running the same window twice sends nothing new.
 
-In my tests on the live site, "+1 day" released Ioana's unconfirmed Wednesday and offered it to Sam, not to Bianca, who only wants Saturdays. Sam paid, and Wednesday was full again.
+In my tests on the live site, “+1 day” released Ioana’s unconfirmed Wednesday and offered it to Sam, not to Bianca, who only wants Saturdays. Sam paid, and Wednesday was full again.
 
 ### Prompts with a test attached
 
 A builder will tell you a feature is done. I needed a way to know.
 
-Each of the 12 prompts ends with a "Done when" line that names exact inputs and results. For the front door, the German message had to give a German summary, 1 h 30 min, 450 to 600 lei, and times only from Tuesday 29 September to Saturday 3 October: the demo clock says Monday, the studio tattoos Tuesday to Saturday, and the sender leaves on Sunday. After each prompt I checked the preview and wrote fix prompts for what failed, such as a demo reset blocked by a foreign key, or a link from a pasted DM that opened an empty step.
+Each of the 12 prompts ends with a “Done when” line that names exact inputs and results. For the front door, the German message had to give a German summary, 1 h 30 min, 450 to 600 lei, and times only from Tuesday 29 September to Saturday 3 October: the demo clock says Monday, the studio tattoos Tuesday to Saturday, and the sender leaves on Sunday. After each prompt I checked the preview and wrote fix prompts for what failed, such as a demo reset blocked by a foreign key, or a link from a pasted DM that opened an empty step.
 
 ### Filming a demo without filming a card
 
@@ -72,7 +72,7 @@ On each Stripe page, recording stops until the payment is done. A build script d
 - Submitted on Contra on 27 September 2026.
 - Live site check: PASS, 0 errors on 13 pages; no horizontal overflow at 375, 768 or 1440 px (27 September 2026).
 - A full rehearsal on the live site passed, including both test payments (27 September 2026).
-- The app's history runs from 00:54 to 16:15 on 27 September 2026: 224 commits, 163 of 200 Lovable credits.
+- The app’s history runs from 00:54 to 16:15 on 27 September 2026: 224 commits, 163 of 200 Lovable credits.
 - The numbers on the demo dashboard come from seeded demo data for a fictional studio. They show how the counting works, not real results.
 
 </Section>
@@ -80,7 +80,7 @@ On each Stripe page, recording stops until the payment is done. A build script d
 <Section id="next">
 
 - Send real messages. Every message goes to an outbox today, and WhatsApp and SMS are labelled as simulated.
-- Confirm on the live site the two fixes I could not watch happen: the waitlist note on a paid booking page, and the shared demo's automatic reset.
-- Move Lovable's badge, which covers the home page's text box at 375 px.
+- Confirm on the live site the two fixes I could not watch happen: the waitlist note on a paid booking page, and the shared demo’s automatic reset.
+- Move Lovable’s badge, which covers the home page’s text box at 375 px.
 
 </Section>

@@ -1,6 +1,6 @@
 <Section id="job">
 
-I'm applying for React and Firebase roles, and I take on small projects for businesses. A portfolio for both has to prove the stack it talks about, so this site is built on it: React for every page, Firebase for everything that has to remember something.
+I’m applying for React and Firebase roles, and I take on small projects for businesses. A portfolio for both has to prove the stack it talks about, so this site is built on it: React for every page, Firebase for everything that has to remember something.
 
 Two groups read it. Hiring teams want to see how I work: the structure, the tests, the decisions. Business owners want to know whether I can build their site, and how to reach me. The site is in English, German and Romanian, and it runs on GitHub Pages, which serves files and nothing else. So there is no server of my own: the security rules are the backend.
 
@@ -8,7 +8,7 @@ Two groups read it. Hiring teams want to see how I work: the structure, the test
 
 <Section id="built">
 
-The design came first, in Claude Design: three directions, then every page for desktop and phone, before any code. The direction that won, "Timetable", uses condensed type, a work list that reads like a train timetable, and one yellow highlighter. The code was written with Claude Code. I review what ships, and the checks below run on every change.
+The design came first, in Claude Design: three directions, then every page for desktop and phone, before any code. The direction that won, “Timetable”, uses condensed type, a work list that reads like a train timetable, and one yellow highlighter. The code was written with Claude Code. I review what ships, and the checks below run on every change.
 
 - Every public page prerendered to HTML at build time with React Router 8: 30 pages, ten in each language, each with hreflang links and its own Content Security Policy.
 - An inquiry form that changes with what you ask about (a project, a job, something else), checks every field as you type, and stores the inquiry in Cloud Firestore.
@@ -26,9 +26,9 @@ The design came first, in Claude Design: three directions, then every page for d
 
 ### No server, and the form still has to be safe
 
-Anyone can call Firestore directly with the site's public config, skipping my form. So the form's checks are only for people; the rules are the check that counts.
+Anyone can call Firestore directly with the site’s public config, skipping my form. So the form’s checks are only for people; the rules are the check that counts.
 
-A new inquiry must have exactly the expected fields, each of the right type and length, a valid e-mail address, the status "new", the sender's own user ID, and a creation time equal to the server's clock. The owner may later change three fields and nothing else. The form and the rules share their limits: the rules tests import the same `LIMITS` object as the form, and test each limit and one character past it, so the two cannot drift apart.
+A new inquiry must have exactly the expected fields, each of the right type and length, a valid e-mail address, the status “new”, the sender’s own user ID, and a creation time equal to the server’s clock. The owner may later change three fields and nothing else. The form and the rules share their limits: the rules tests import the same `LIMITS` object as the form, and test each limit and one character past it, so the two cannot drift apart.
 
 ```
 // firestore.rules
@@ -76,14 +76,14 @@ The home page ships about 130 KB of JavaScript, compressed, and no Firebase code
 
 The privacy notice promises that an inquiry is deleted after 12 months, and a promise like that is easy to forget. So every inquiry carries an `expireAt` date a year ahead, and the rules refuse any other date. The client sets it from its own clock, so the rule accepts it within a day either way.
 
-Firestore's time-to-live policy would delete such documents by itself, but it needs the paid Blaze plan, and this site runs on the free one. So the inbox does it: each time I open it, it queries every inquiry past its date and deletes it together with my note on it, in one batch. My notes copy their inquiry's `expireAt`, and the rules check that they match, so a note cannot outlive its inquiry.
+Firestore’s time-to-live policy would delete such documents by itself, but it needs the paid Blaze plan, and this site runs on the free one. So the inbox does it: each time I open it, it queries every inquiry past its date and deletes it together with my note on it, in one batch. My notes copy their inquiry’s `expireAt`, and the rules check that they match, so a note cannot outlive its inquiry.
 
 </Section>
 
 <Section id="results">
 
 - 29 security-rule tests pass against the Firestore emulator, and 65 unit tests pass (27 September 2026).
-- The end-to-end test passes all 12 checks: sending, validation, the rate limit, a stranger's browser refused, the owner's sign-in, and the status page changing live (27 September 2026).
+- The end-to-end test passes all 17 checks: case studies opening from the work list in three languages, sending, validation, the rate limit, a stranger’s browser refused, the owner’s sign-in, and the status page changing live (27 September 2026).
 - 30 pages prerendered in three languages, with no horizontal scroll at 375 px and no console errors.
 - Home page: about 130 KB of JavaScript, compressed, with no Firebase code.
 
@@ -92,7 +92,7 @@ Firestore's time-to-live policy would delete such documents by itself, but it ne
 <Section id="next">
 
 - Add App Check with reCAPTCHA Enterprise, so only this site can write to Firestore.
-- On the Blaze plan: let Firestore's time-to-live policy delete old inquiries, and send me an e-mail for each new one from a Cloud Function.
+- On the Blaze plan: let Firestore’s time-to-live policy delete old inquiries, and send me an e-mail for each new one from a Cloud Function.
 - Send inquiries with Firestore Lite, which is much smaller, and keep the full SDK only for the pages that update live.
 
 </Section>

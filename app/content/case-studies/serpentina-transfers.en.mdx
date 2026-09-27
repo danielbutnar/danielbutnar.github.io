@@ -8,18 +8,18 @@ In the brief, many travellers are German or Austrian, and many book late at nigh
 
 <Section id="built">
 
-Claude Design produced two visual directions. I picked "Wayfinding grid", which borrows from airport signs: yellow and black, numbered section bars, square corners, and the white name sign a driver holds up in arrivals. Then I built it as a Next.js 16 static export.
+Claude Design produced two visual directions. I picked “Wayfinding grid”, which borrows from airport signs: yellow and black, numbered section bars, square corners, and the white name sign a driver holds up in arrivals. Then I built it as a Next.js 16 static export.
 
 - A fixed price on the first screen, per vehicle, in euro, or in lei on the Romanian pages.
-- A name sign that repeats the traveller's name while they type it.
+- A name sign that repeats the traveller’s name while they type it.
 - Booking in three steps: a demo flight lookup, passengers and luggage, a vehicle that fits, an optional return trip, and a calendar file at the end.
 - Manage booking: change the pickup time or cancel, with the refund rule shown before you confirm.
-- An owner dashboard: today's rides with statuses that follow the clock, driver assignment, and a price editor.
+- An owner dashboard: today’s rides with statuses that follow the clock, driver assignment, and a price editor.
 - 20 route pages per language, each with a map drawn from real coordinates.
 
-Nothing is charged and nothing is sent. Bookings stay in the visitor's browser, and every page says the company is not real.
+Nothing is charged and nothing is sent. Bookings stay in the visitor’s browser, and every page says the company is not real.
 
-<Shot name="serpentina-transfers-dashboard" kind="desktop" alt="The owner dashboard: today's rides with statuses, drivers and a delayed flight." caption="The owner dashboard. Ride statuses follow the clock." />
+<Shot name="serpentina-transfers-dashboard" kind="desktop" alt="The owner dashboard: today’s rides with statuses, drivers and a delayed flight." caption="The owner dashboard. Ride statuses follow the clock." />
 
 </Section>
 
@@ -27,9 +27,9 @@ Nothing is charged and nothing is sent. Bookings stay in the visitor's browser, 
 
 ### The owner changes a price and the whole site follows
 
-A static site has no database. Yet the dashboard's price editor has to change every price on every page: the booking panel, both price tables, the booking steps and the route pages.
+A static site has no database. Yet the dashboard’s price editor has to change every price on every page: the booking panel, both price tables, the booking steps and the route pages.
 
-The edited table lives in the browser's localStorage. Components read it through one hook built on React's useSyncExternalStore. Its server snapshot is the default table, so the prerendered HTML and the first client render always match, and the stored prices replace the defaults right after hydration. The snapshot caches the parsed table by its raw string, because the hook needs the same object back while nothing has changed, or React renders in a loop.
+The edited table lives in the browser’s localStorage. Components read it through one hook built on React’s useSyncExternalStore. Its server snapshot is the default table, so the prerendered HTML and the first client render always match, and the stored prices replace the defaults right after hydration. The snapshot caches the parsed table by its raw string, because the hook needs the same object back while nothing has changed, or React renders in a loop.
 
 ```ts
 // src/lib/prices.ts
@@ -46,15 +46,15 @@ A stored table is used only if every route has a whole-euro price between 10 and
 
 ### One quote, four places on the page
 
-The home page shows the price in the booking panel, in a matrix on desktop and on a board on phones, while the name sign shows the traveller's name. If each part kept its own state, they would drift apart.
+The home page shows the price in the booking panel, in a matrix on desktop and on a board on phones, while the name sign shows the traveller’s name. If each part kept its own state, they would drift apart.
 
-One React context holds the quote: airport, destination, passengers, name and date. Picking a price in either table loads that route into the form and scrolls to it, smoothly unless the visitor has turned motion off. A short announcement tells screen-reader users which route was loaded. "Book this transfer" hands the same state to the booking flow, where tested rules pick a vehicle that fits: a sedan takes three passengers and three suitcases, an estate four passengers and five pieces, and five to eight people need the minibus.
+One React context holds the quote: airport, destination, passengers, name and date. Picking a price in either table loads that route into the form and scrolls to it, smoothly unless the visitor has turned motion off. A short announcement tells screen-reader users which route was loaded. “Book this transfer” hands the same state to the booking flow, where tested rules pick a vehicle that fits: a sedan takes three passengers and three suitcases, an estate four passengers and five pieces, and five to eight people need the minibus.
 
 ### A map drawn from real coordinates
 
 I wanted each route page to show the road, without map tiles or a third-party widget.
 
-Every town and airport on the map has its real longitude and latitude. The code projects them flat and scales longitude by the cosine of 45.6°, a latitude near the middle of the map, so east-west distances are not stretched. Each route is a list of towns along the main road. For a route page, the code takes that route's bounding box, pads it, widens it to a 4:3 frame, and passes a scale factor so labels and markers keep the same size on screen at every zoom. Each label sits on the side away from the next point on the route.
+Every town and airport on the map has its real longitude and latitude. The code projects them flat and scales longitude by the cosine of 45.6°, a latitude near the middle of the map, so east-west distances are not stretched. Each route is a list of towns along the main road. For a route page, the code takes that route’s bounding box, pads it, widens it to a 4:3 frame, and passes a scale factor so labels and markers keep the same size on screen at every zoom. Each label sits on the side away from the next point on the route.
 
 ```ts
 // src/lib/route-map.ts
@@ -90,6 +90,6 @@ So the Content Security Policy is a meta tag that still blocks every third-party
 
 - Add a real Stripe checkout in test mode. That needs a server, for example on Vercel, instead of GitHub Pages.
 - Have the Romanian and German copy reviewed; both are still drafts.
-- Move the browser tests into the repository. Today the Playwright scripts live outside it, and the repository's gate is the unit tests plus the site check.
+- Move the browser tests into the repository. Today the Playwright scripts live outside it, and the repository’s gate is the unit tests plus the site check.
 
 </Section>

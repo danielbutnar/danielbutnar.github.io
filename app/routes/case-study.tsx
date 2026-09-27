@@ -26,14 +26,14 @@ export async function loader({ params }: Route.LoaderArgs) {
   return null;
 }
 
-// On client navigation, fetch the text together with the route data.
-export async function clientLoader({ params, serverLoader }: Route.ClientLoaderArgs) {
+// On client navigation, only the case study text is needed. The server loader
+// has no data to send, and calling it would fetch "<path>/_.data", which GitHub
+// Pages does not have for trailing-slash URLs (a 404 that showed "Page not found").
+export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   const locale = localeFromParam(params.lang);
   const project = findProject(params.slug);
-  await Promise.all([
-    serverLoader(),
-    project && locale ? loadCaseStudy(project.slug, locale) : null,
-  ]);
+  if (!locale || !project || !(await loadCaseStudy(project.slug, locale)))
+    throw data(null, { status: 404 });
   return null;
 }
 

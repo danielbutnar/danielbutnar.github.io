@@ -21,12 +21,12 @@ It is also a working React and Firebase app. The case study
 
 ## Tests
 
-| Command                           | What it runs                                                                                                                                    |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test`                       | 65 unit tests: validation, locale paths, dictionaries, content integrity                                                                        |
-| `pnpm test:rules`                 | 29 security-rule tests against the Firestore emulator                                                                                           |
-| `pnpm build:e2e && pnpm test:e2e` | The inquiry flow in Chrome against the Auth and Firestore emulators: send, validate, rate limit, a stranger refused, owner sign-in, live status |
-| `pnpm check`                      | typecheck, lint and unit tests                                                                                                                  |
+| Command                           | What it runs                                                                                                                                                           |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test`                       | 65 unit tests: validation, locale paths, dictionaries, content integrity                                                                                               |
+| `pnpm test:rules`                 | 29 security-rule tests against the Firestore emulator                                                                                                                  |
+| `pnpm build:e2e && pnpm test:e2e` | Chrome against the Auth and Firestore emulators: case studies open from the work list, then send, validate, rate limit, a stranger refused, owner sign-in, live status |
+| `pnpm check`                      | typecheck, lint and unit tests                                                                                                                                         |
 
 The emulators need Java 21. The end-to-end test drives the installed Chrome. CI
 (`.github/workflows/deploy.yml`) runs all of it on every push, deploys `main` to GitHub Pages and
