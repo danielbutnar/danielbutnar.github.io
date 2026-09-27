@@ -1,0 +1,82 @@
+<Section id="job">
+
+Der European Accessibility Act gilt seit dem 28. Juni 2025, und Deutschland, Österreich und Rumänien setzen ihn jeweils mit einem eigenen Gesetz um. Ich wollte wissen, wie Onlineshops in Rumänien und Deutschland tatsächlich abschneiden, mit Zahlen, hinter denen ich stehen kann.
+
+Deshalb habe ich am 15. September 2026 die Startseiten von 44 bekannten Onlineshops und Dienstleistern gescannt, 24 in Rumänien und 20 in Deutschland, aus Handel, Telekommunikation, Banken und Verkehr. Die Ergebnisse sollten öffentlich und nützlich sein, ohne Namen zu nennen, und die Werkzeuge gut genug, um sie für meine eigenen Websites wiederzuverwenden.
+
+</Section>
+
+<Section id="built">
+
+Eine Scan-Pipeline, eine Studien-Website in drei Sprachen und ein QA-Werkzeugkasten, der aus beidem entstanden ist.
+
+- Ein Audit-Skript, das Chrome über Playwright steuert, axe-core 4.13 nur mit den Regeln für WCAG 2.0 und 2.1 A und AA injiziert und Verstöße, Fälle zur manuellen Prüfung („needs review“) und Strukturprüfungen festhält.
+- Eine Studienseite auf Englisch, Deutsch und Rumänisch mit den wichtigsten Zahlen, den häufigsten Fehlern und einer anonymisierten Tabelle aller 42 Websites.
+- Ein Beispielbericht zu einer anonymisierten Startseite, mit Belegen, gemessenen Farbkontrasten und korrigiertem Code für jeden Befund.
+- Eine Demoseite mit sechs Barrieren, jeweils vorher und nachher, mit simulierter Screenreader-Ausgabe.
+- Skripte, die die Studien-Website an ihrem eigenen Maßstab messen.
+- site-qa: ein öffentlicher, wiederverwendbarer GitHub-Actions-Workflow mit Site-Check und Design-Lint, den inzwischen meine anderen statischen Websites nutzen.
+
+<Shot name="accessibility-study-results" kind="desktop" alt="Die Studienseite: die wichtigsten Zahlen und ein Balkendiagramm der Regeln, die am häufigsten verletzt werden." caption="Die veröffentlichte Studie. Jede Zahl wird aus den Rohdaten neu erzeugt." />
+
+</Section>
+
+<Section id="hard">
+
+### Die Seite hinter dem Cookie-Banner scannen
+
+Die meisten Shop-Startseiten öffnen mit einem Einwilligungsdialog. Wer nur den scannt, erfährt etwas über das Banner, nicht über den Shop.
+
+Das Skript scannt die Seite so, wie sie ankommt. Dann sucht es einen Einwilligungsbutton über seinen zugänglichen Namen und probiert dabei Beschriftungen wie „Ablehnen“ auf Rumänisch, Deutsch und Englisch vor jeder Beschriftung wie „Akzeptieren“, damit es wenn möglich die datenschutzfreundliche Wahl trifft. Klickt es einen an, scannt es noch einmal.
+
+```js
+// tools/audit/audit.mjs
+out.asLanded = await runAxe(page);
+out.asLanded.summary = summarize(out.asLanded.violations);
+out.consentClicked = await dismissConsent(page);
+if (out.consentClicked) {
+  out.afterConsent = await runAxe(page);
+  out.afterConsent.summary = summarize(out.afterConsent.violations);
+}
+```
+
+Bot-Sperren (Fehlerseiten, fast leere Seiten, Titel wie „Just a moment“) werden als blockiert markiert statt bewertet. Zwei deutsche Websites haben den automatisierten Zugriff blockiert, deshalb zählt die Studie 42 Websites statt 44.
+
+### Zahlen, die nicht von den Daten abweichen können
+
+Eine solche Studie ist nur etwas wert, wenn jede Zahl auf der Seite zu den Rohdaten passt, in allen drei Sprachen, und keine Website genannt wird.
+
+Die Liste der Websites und die Ergebnisse mit Namen liegen in einem privaten Ordner, den git ignoriert. Ein Skript liest die anonymisierte Zusammenfassung und schreibt die Tabelle zwischen zwei Markern in der englischen, deutschen und rumänischen Studienseite neu, wobei es Branche, Größe und Regelnamen gleich mit übersetzt. Die Regeln des Projekts verbieten, eine Zahl der Studie von Hand zu ändern: Pipeline neu laufen lassen, Tabellen neu erzeugen, dann den Fließtext anpassen. Auf den öffentlichen Seiten erscheinen Websites nur als IDs wie RO-08, mit Land, Branche und Größe.
+
+### Eine Website über Barrierefreiheit muss ihren eigenen Test bestehen
+
+Befunde zur Barrierefreiheit auf einer Seite zu veröffentlichen, die denselben Scan nicht besteht, würde das ganze Argument entwerten.
+
+Ein Selbsttest-Skript lädt jede Seite in Chrome und lässt axe laufen, erweitert um die Regeln für WCAG 2.2 AA und Best Practices, dazu Prüfungen auf Head-Tags, genau ein h1, den Skip-Link, Links, Konsolenfehler und Überlauf bei 375 px. axe wird über das Chrome DevTools Protocol injiziert, sodass die eigene Content Security Policy der Seite während des Tests aktiv bleibt. Ein zweites Skript testet das Verhalten: Der erste Tab-Stopp muss der Skip-Link sein und den Fokus zum Hauptinhalt verschieben, jeder Fokusring muss mindestens 2 px breit sein, und das mobile Menü muss geschlossen inert sein und bei Escape den Fokus zurückgeben. Die kaputten Beispiele der Demoseite stecken in inerten Containern, sodass die Seite konform bleibt, während sie Fehler zeigt.
+
+### Ein Check für jede Website
+
+Nach der Studie wollte ich dieselben Prüfungen auf jeder Website, die ich baue, und nicht eine Kopie in jedem Repository.
+
+site-check verallgemeinert den Selbsttest. Es liefert einen Ordner so aus wie GitHub Pages, crawlt bis zu 60 Seiten und testet jede bei 375, 768 und 1440 px: axe (mit Kontrast im Dark Mode, wenn die Website ein dunkles Farbschema hat), Head-Tags, HTML-Validität, Überlauf, Konsolen- und CSP-Fehler, kaputte Links, zu große Dateien und Deployment-Dateien wie robots.txt und die 404-Seite. Fehler lassen den Job scheitern, Warnungen werden nur ausgegeben. design-lint durchsucht den Quellcode mit 23 Metriken nach Abweichungen von den Design-Tokens und nach dem generischen KI-Look. Es arbeitet nach dem Ratschenprinzip: Ein Zähler darf sinken, aber nie steigen. Beide laufen aus einem wiederverwendbaren GitHub-Actions-Workflow.
+
+</Section>
+
+<Section id="results">
+
+- 37 der 42 Startseiten, die geantwortet haben, fallen bei mindestens einer Regel nach WCAG 2.1 A oder AA durch: 88 % (Scan vom 15. September 2026).
+- Alle 24 rumänischen Startseiten fallen durch, mit durchschnittlich 77 fehlerhaften Elementen pro Seite (Median 68). 13 von 18 deutschen Startseiten fallen durch, mit durchschnittlich 13 (Median 6).
+- Insgesamt 2.080 fehlerhafte Elemente. Vier Regeltypen (Textkontrast, Links ohne Text, Bilder ohne Alternativtext, Buttons ohne Namen) machen 1.819 davon aus, also 87 %.
+- 21 von 42 haben mindestens ein kritisches Problem, und nur 11 von 42 bieten einen Skip-Link.
+- site-check ist seitdem mit 0 Fehlern durchgelaufen: auf 9 Seiten von Brasov Private Tours (25. September 2026), 78 Seiten von Serpentina Transfers und 13 Seiten von Rope Street Tattoo (27. September 2026).
+
+</Section>
+
+<Section id="next">
+
+- Eine Stichprobe von Hand testen. Automatische Prüfungen finden nur einen Teil der Barrieren, meist auf 30 bis 40 % geschätzt, deshalb ist jede Zahl hier eine Untergrenze.
+- Über die Startseite hinausgehen. Gescannt wurden nur Startseiten, und nur am Desktop; Produktseiten und Checkouts haben meist mehr Fehler, nicht weniger.
+- Die Studie 2027 wiederholen, für einen Vergleich nach einem Jahr.
+- Die Auswertung als eigenes Skript ins Repository holen.
+
+</Section>

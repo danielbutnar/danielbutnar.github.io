@@ -1,0 +1,11 @@
+node_modules/
+build/
+.react-router/
+*.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+.env*
+!.env.example
+.qa/
+coverage/

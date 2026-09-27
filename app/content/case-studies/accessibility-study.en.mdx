@@ -1,0 +1,82 @@
+<Section id="job">
+
+The European Accessibility Act has applied since 28 June 2025, and Germany, Austria and Romania each have their own law that puts it into force. I wanted to know how shops in Romania and Germany actually do, with numbers I could stand behind.
+
+So on 15 September 2026 I scanned the homepages of 44 well-known online shops and service providers, 24 in Romania and 20 in Germany, across retail, telecom, banking and transport. The results had to be public and useful without naming anyone, and the tooling had to be good enough to reuse on my own sites.
+
+</Section>
+
+<Section id="built">
+
+A scanning pipeline, a study site in three languages, and a QA toolkit that grew out of both.
+
+- An audit script that drives Chrome through Playwright, injects axe-core 4.13 with only the WCAG 2.0 and 2.1 A and AA rules, and records violations, "needs review" items and structure checks.
+- A study page in English, German and Romanian with the key numbers, the most common failures and an anonymised table of all 42 sites.
+- A sample report on one anonymised homepage, with evidence, measured colour contrasts and fixed code for each finding.
+- A demo page of six barriers as found and as fixed, with a simulated screen-reader readout.
+- Scripts that hold the study site to its own standard.
+- site-qa: a public, reusable GitHub Actions workflow with a site check and a design lint, now used by my other static sites.
+
+<Shot name="accessibility-study-results" kind="desktop" alt="The study page: key numbers and a bar chart of the rules that fail most often." caption="The published study. Every number is rebuilt from the raw results." />
+
+</Section>
+
+<Section id="hard">
+
+### Scanning the page behind the cookie banner
+
+Most shop homepages open with a consent dialog. Scan only that, and you learn about the banner, not the shop.
+
+The script scans the page as it lands. Then it looks for a consent button by its accessible name, trying "reject" labels in Romanian, German and English before any "accept" label, so it takes the privacy-preserving choice when it can. If it clicks one, it scans again.
+
+```js
+// tools/audit/audit.mjs
+out.asLanded = await runAxe(page);
+out.asLanded.summary = summarize(out.asLanded.violations);
+out.consentClicked = await dismissConsent(page);
+if (out.consentClicked) {
+  out.afterConsent = await runAxe(page);
+  out.afterConsent.summary = summarize(out.afterConsent.violations);
+}
+```
+
+Bot walls (error pages, near-empty pages, titles like "Just a moment") are marked as blocked instead of scored. Two German sites blocked automated access, which is why the study counts 42 sites, not 44.
+
+### Numbers that cannot drift from the data
+
+A study like this is only worth something if every number on the page matches the raw results, in all three languages, and no site is named.
+
+The list of sites and the named results live in a git-ignored private folder. A script reads the anonymised summary and rewrites the table between two markers in the English, German and Romanian study pages, translating sector, size and rule names as it goes. The project's rules forbid editing a study number by hand: re-run the pipeline, rebuild the tables, then update the prose. On the public pages, sites appear only as IDs such as RO-08, with country, sector and size.
+
+### A site about accessibility has to pass its own test
+
+Publishing accessibility findings on a page that fails the same scan would undo the argument.
+
+A self-check script loads every page in Chrome and runs axe with the WCAG 2.2 AA and best-practice rules added, plus checks for head tags, one h1, the skip link, links, console errors and overflow at 375 px. axe is injected over the Chrome DevTools Protocol, so the page's own Content Security Policy stays on during the test. A second script tests behaviour: the first Tab stop must be the skip link and must move focus to the main content, every focus ring must be at least 2 px wide, and the mobile menu must be inert when closed and return focus on Escape. The demo page's broken examples sit inside inert containers, so the page stays conformant while it shows failures.
+
+### One check for every site
+
+After the study, I wanted the same checks on every site I build, not a copy in each repository.
+
+site-check generalises the self-check. It serves a folder the way GitHub Pages does, crawls up to 60 pages, and tests each at 375, 768 and 1440 px: axe (with dark-mode contrast when the site has a dark scheme), head tags, HTML validity, overflow, console and CSP errors, broken links, oversized files, and deployment files such as robots.txt and the 404 page. Errors fail the job; warnings are only printed. design-lint scans the source with 23 metrics for design-token drift and the generic AI-generated look. It is a ratchet: a count may fall but never rise. Both run from one reusable GitHub Actions workflow.
+
+</Section>
+
+<Section id="results">
+
+- 37 of the 42 homepages that answered fail at least one WCAG 2.1 A or AA rule: 88 % (scan of 15 September 2026).
+- All 24 Romanian homepages fail, with 77 failing elements per page on average (median 68). 13 of 18 German homepages fail, with 13 on average (median 6).
+- 2,080 failing elements in total. Four rule types (text contrast, links without text, images without alt text, buttons without a name) account for 1,819 of them, 87 %.
+- 21 of 42 have at least one critical issue, and only 11 of 42 offer a skip link.
+- site-check has since passed with 0 errors on 9 pages of Brasov Private Tours (25 September 2026), 78 pages of Serpentina Transfers and 13 pages of Rope Street Tattoo (27 September 2026).
+
+</Section>
+
+<Section id="next">
+
+- Test a sample by hand. Automated checks find only part of the barriers, commonly estimated at 30 to 40 %, so every number here is a lower bound.
+- Go beyond the homepage. Only homepages were scanned, on desktop; product pages and checkouts usually have more failures, not fewer.
+- Re-run the study in 2027 for a one-year comparison.
+- Move the aggregation into the repository as a script of its own.
+
+</Section>

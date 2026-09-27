@@ -1,0 +1,12 @@
+{
+  "name": "Daniel Butnar",
+  "short_name": "Daniel Butnar",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#eef1ec",
+  "theme_color": "#eef1ec",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/apple-touch-icon.png", "type": "image/png", "sizes": "180x180" }
+  ]
+}

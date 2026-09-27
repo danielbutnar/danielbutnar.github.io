@@ -1,0 +1,88 @@
+# Checks every push and pull request; builds and deploys main to GitHub Pages
+# (https://danielbutnar.github.io/), then runs site-check against the live site.
+name: check and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      # The Firebase emulators need Java.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - name: Security rules against the Firestore emulator
+        run: pnpm test:rules
+      - name: End-to-end test against the Auth and Firestore emulators
+        run: |
+          pnpm build:e2e
+          pnpm test:e2e
+      - name: Production build
+        run: pnpm build
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/client
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  # Reports only: the site is already live. Uses the shared checks from danielbutnar2003/site-qa.
+  live-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: danielbutnar2003/site-qa
+          path: site-qa
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site-qa/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile --dir site-qa
+      - name: site-check on the live site
+        run: |
+          sleep 30
+          node site-qa/site-check.mjs --base https://danielbutnar.github.io/ --out "$RUNNER_TEMP/site-check" --no-shots

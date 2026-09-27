@@ -1,0 +1,95 @@
+<Section id="job">
+
+Serpentina Transfers ist ein fiktives Unternehmen und mein Portfolio-Konzept dafür, was ein kleines Transferunternehmen online haben kann. Es fährt Reisende von vier Flughäfen (Bukarest-Otopeni, Brașov-Ghimbav, Sibiu und Cluj) nach Brașov, Poiana Brașov, Bran, Predeal und Sinaia.
+
+Laut Briefing kommen viele Reisende aus Deutschland oder Österreich, und viele buchen spätabends am Handy. Deshalb muss der erste Bildschirm drei Fragen auf einmal beantworten: Was kostet es, wie buche ich, und wer holt mich ab? Die Website musste auf Englisch, Rumänisch und Deutsch funktionieren, auf den rumänischen Seiten Lei anzeigen und auf GitHub Pages laufen, ohne Server dahinter.
+
+</Section>
+
+<Section id="built">
+
+Claude Design hat zwei visuelle Richtungen entworfen. Ich habe „Wayfinding grid“ gewählt, das sich an Flughafenschildern orientiert: Gelb und Schwarz, nummerierte Abschnittsbalken, eckige Kanten und das weiße Namensschild, das ein Fahrer in der Ankunftshalle hochhält. Dann habe ich es als statischen Export mit Next.js 16 gebaut.
+
+- Ein Festpreis auf dem ersten Bildschirm, pro Fahrzeug, in Euro oder auf den rumänischen Seiten in Lei.
+- Ein Namensschild, auf dem der Name schon beim Eintippen erscheint.
+- Buchung in drei Schritten: eine Demo-Flugsuche, Personen und Gepäck, ein passendes Fahrzeug, eine optionale Rückfahrt und am Ende eine Kalenderdatei.
+- Buchung verwalten: Abholzeit ändern oder stornieren, mit der Erstattungsregel vor dem Bestätigen.
+- Ein Inhaber-Dashboard: die Fahrten des Tages mit einem Status, der der Uhr folgt, Fahrerzuweisung und ein Preiseditor.
+- 20 Streckenseiten pro Sprache, jede mit einer Karte aus echten Koordinaten.
+
+Es wird nichts berechnet und nichts verschickt. Buchungen bleiben im Browser der Besucher, und jede Seite sagt, dass es das Unternehmen nicht gibt.
+
+<Shot name="serpentina-transfers-dashboard" kind="desktop" alt="Das Inhaber-Dashboard: die Fahrten des Tages mit Status, Fahrern und einem verspäteten Flug." caption="Das Inhaber-Dashboard. Der Status jeder Fahrt folgt der Uhr." />
+
+</Section>
+
+<Section id="hard">
+
+### Der Inhaber ändert einen Preis, und die ganze Website zieht mit
+
+Eine statische Website hat keine Datenbank. Trotzdem muss der Preiseditor im Dashboard jeden Preis auf jeder Seite ändern: im Buchungspanel, in beiden Preistabellen, in den Buchungsschritten und auf den Streckenseiten.
+
+Die bearbeitete Tabelle liegt im localStorage des Browsers. Komponenten lesen sie über einen einzigen Hook, der auf useSyncExternalStore von React aufbaut. Sein Server-Snapshot ist die Standardtabelle, deshalb stimmen das vorgerenderte HTML und der erste Render im Client immer überein, und die gespeicherten Preise ersetzen die Standardwerte direkt nach der Hydration. Der Snapshot cacht die geparste Tabelle anhand ihres Rohstrings, denn der Hook muss dasselbe Objekt zurückbekommen, solange sich nichts geändert hat, sonst rendert React in einer Endlosschleife.
+
+```ts
+// src/lib/prices.ts
+function snapshot(): PriceTable {
+  const raw = readRaw();
+  if (raw === cache.raw) return cache.table;
+  // …
+export function usePrices(): PriceTable {
+  return useSyncExternalStore(subscribe, snapshot, () => DEFAULT_PRICES);
+}
+```
+
+Eine gespeicherte Tabelle wird nur verwendet, wenn jede Strecke einen Preis in ganzen Euro zwischen 10 und 1.000 hat. Jede Funktion, die einen Preis anzeigt oder abrechnet, bekommt die Tabelle als Argument, sodass keine Komponente stillschweigend auf die Standardwerte zurückfallen kann.
+
+### Ein Angebot, vier Stellen auf der Seite
+
+Die Startseite zeigt den Preis im Buchungspanel, am Desktop in einer Matrix und am Handy auf einer Anzeigetafel, während das Namensschild den Namen des Fahrgasts zeigt. Hätte jeder Teil seinen eigenen Zustand, würden sie auseinanderlaufen.
+
+Ein einziger React-Context hält das Angebot: Flughafen, Ziel, Personen, Name und Datum. Ein Klick auf einen Preis in einer der beiden Tabellen lädt diese Strecke ins Formular und scrollt dorthin, weich, außer Animationen sind abgeschaltet. Eine kurze Ansage sagt Screenreader-Nutzern, welche Strecke geladen wurde. „Diesen Transfer buchen“ übergibt denselben Zustand an den Buchungsablauf, wo getestete Regeln ein passendes Fahrzeug wählen: Eine Limousine nimmt drei Personen und drei Koffer, ein Kombi vier Personen und fünf Gepäckstücke, und fünf bis acht Personen brauchen den Kleinbus.
+
+### Eine Karte aus echten Koordinaten
+
+Ich wollte, dass jede Streckenseite die Straße zeigt, ohne Kartenkacheln und ohne Widget eines Drittanbieters.
+
+Jeder Ort und jeder Flughafen auf der Karte hat seinen echten Längen- und Breitengrad. Der Code projiziert sie in die Ebene und skaliert die Länge mit dem Kosinus von 45,6°, einem Breitengrad etwa in der Mitte der Karte, damit Ost-West-Abstände nicht gestreckt werden. Jede Strecke ist eine Liste von Orten entlang der Hauptstraße. Für eine Streckenseite nimmt der Code die Bounding Box dieser Strecke, gibt ihr etwas Rand, erweitert sie auf einen 4:3-Ausschnitt und übergibt einen Skalierungsfaktor, damit Beschriftungen und Markierungen bei jedem Zoom auf dem Bildschirm gleich groß bleiben. Jede Beschriftung steht auf der Seite, die vom nächsten Punkt der Strecke wegzeigt.
+
+```ts
+// src/lib/route-map.ts
+const SCALE = 88; // px per degree of latitude
+const LON_SCALE = SCALE * Math.cos((45.6 * Math.PI) / 180);
+// …
+export function project(node: Node): { x: number; y: number } {
+  return { x: Math.round((node.lon - WEST) * LON_SCALE * 10) / 10, y: Math.round((NORTH - node.lat) * SCALE * 10) / 10 };
+}
+```
+
+<Shot name="serpentina-transfers-route" kind="desktop" alt="Eine Streckenseite mit einer Karte der Straße vom Flughafen Otopeni nach Poiana Brașov." caption="Streckenseiten zeichnen die Straße aus echten Koordinaten, ganz ohne Kartenkacheln." />
+
+### Eine statische Website, die sich wie eine App verhält
+
+GitHub Pages liefert Dateien aus und sonst nichts: keine Header, keine Weiterleitungen, kein Servercode.
+
+Deshalb ist die Content Security Policy ein Meta-Tag, das trotzdem alle fremden Quellen blockiert. Die Root-Seite leitet per Meta-Refresh auf die englische Seite weiter, und unbekannte URLs bekommen eine echte 404-Seite. Seiten, die den Browser-Speicher lesen, rendern erst nach der Hydration, damit das HTML nie von React abweicht. Eine Falle kam aus dem Build selbst: Unter Windows schreibt Next 16.3 Prefetch-Dateien unter falschen Namen. Deshalb wird die Website nur aus dem Linux-Build in GitHub Actions deployt, nachdem Formatierung, Typen, Lint und Tests bestanden sind.
+
+</Section>
+
+<Section id="results">
+
+- Site-Check der Live-Website: PASS, 0 Fehler auf allen 78 Seiten (27. September 2026).
+- Lighthouse-Labormessungen auf der Live-Website (27. September 2026): Leistung 100 am Desktop, am Handy je nach Durchlauf 73 bis 94, Barrierefreiheit 100 und Best Practices 100 in jedem Durchlauf.
+- 34 Unit-Tests, die bei jedem Push auf main und bei jedem Pull Request laufen.
+- 26 Seiten in jeder der 3 Sprachen: Startseite, Buchung, Buchung verwalten, Dashboard, eine Streckenübersicht, 20 Streckenseiten und die Fallstudie.
+- axe prüft jede Seite bei 375, 768 und 1440 px, und Buchung und Stornierung wurden nur mit der Tastatur getestet.
+
+</Section>
+
+<Section id="next">
+
+- Einen echten Stripe-Checkout im Testmodus einbauen. Dafür braucht es einen Server, zum Beispiel auf Vercel, statt GitHub Pages.
+- Die rumänischen und deutschen Texte prüfen lassen; beide sind noch Entwürfe.
+- Die Browser-Tests ins Repository holen. Bisher liegen die Playwright-Skripte außerhalb, und das Quality Gate im Repository besteht aus den Unit-Tests und dem Site-Check.
+
+</Section>

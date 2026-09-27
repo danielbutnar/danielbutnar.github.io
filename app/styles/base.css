@@ -1,0 +1,326 @@
+/* Tokens from the "Timetable" direction in Claude Design. */
+:root {
+  --paper: #eef1ec;
+  --paper-raised: #f8faf7;
+  --paper-sunk: #e1e7e1;
+  --ink: #14201b;
+  --ink-soft: #2b3832;
+  --muted: #4a5750;
+  --rule: #a9b4ac;
+  --field: #6b7a72;
+  --blue: #1f47b8;
+  --blue-dark: #14307f;
+  --marker: #f2cf3a;
+  --error: #a1261b;
+  --on-ink: #eef1ec;
+  --on-ink-muted: #a7b3ab;
+  --on-ink-rule: #3a4a42;
+
+  --font-display: "Anybody", "Arial Narrow", sans-serif;
+  --font-body: "Hanken Grotesk", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+
+  /* 20 px at 390 wide, 80 px at 1440 wide. */
+  --gutter: clamp(1.25rem, -0.14rem + 5.71vw, 5rem);
+  --content: 80rem;
+  --section-gap: clamp(3.5rem, 2.4rem + 4.5vw, 7rem);
+
+  --text-hero: clamp(3.875rem, 2.16rem + 7.05vw, 8.5rem);
+  --text-h2: clamp(2.75rem, 2.285rem + 1.905vw, 4rem);
+  --text-h3: clamp(1.75rem, 1.64rem + 0.45vw, 2.25rem);
+  --text-lead: clamp(1.0625rem, 0.99rem + 0.3vw, 1.25rem);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: 1.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+a {
+  color: var(--blue);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  color: var(--blue-dark);
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--marker);
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: var(--ink);
+  color: var(--marker);
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.wrap {
+  width: min(100% - 2 * var(--gutter), var(--content));
+  margin-inline: auto;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+/* Condensed display type: headlines, project names, big numerals. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: 70%;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.display--tight {
+  font-stretch: 62%;
+  line-height: 0.9;
+}
+
+/* The yellow highlighter. `box-decoration-break` keeps it on every line. */
+.marker {
+  background: linear-gradient(var(--marker), var(--marker)) no-repeat 0 0 / 100% 100%;
+  padding: 0.02em 0.14em 0.08em;
+  margin-inline: -0.14em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 3px solid var(--ink);
+}
+
+.section-head h2 {
+  font-size: var(--text-h2);
+}
+
+.section-head p {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+/* Buttons are links or buttons that look like the design's solid blocks. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  padding: 0.5rem 1.5rem;
+  border: 2px solid transparent;
+  font-weight: 600;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+
+.button:hover {
+  text-decoration: none;
+}
+
+.button--primary {
+  background: var(--blue);
+  color: #fff;
+}
+
+.button--primary:hover {
+  background: var(--blue-dark);
+  color: #fff;
+}
+
+.button--outline {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.button--outline:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.button--ink {
+  background: var(--ink);
+  color: var(--marker);
+  font-weight: 700;
+}
+
+.button--ink:hover {
+  background: #000;
+  color: var(--marker);
+}
+
+.button--marker {
+  background: var(--marker);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.button--marker:hover {
+  background: #ffe066;
+  color: var(--ink);
+}
+
+.button--light {
+  border-color: var(--on-ink);
+  color: var(--on-ink);
+}
+
+.button--light:hover {
+  background: var(--on-ink);
+  color: var(--ink);
+}
+
+.button[disabled],
+.button[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Status squares in the work table and case study facts. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status::before {
+  content: "";
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--ink);
+}
+
+.status--live::before {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.status--prelaunch::before {
+  background: var(--marker);
+}
+
+.status--concept::before {
+  background: transparent;
+}
+
+/* Lets <dl> keep a <div> per term and description while its grid lays out dt and dd. */
+.dl-row {
+  display: contents;
+}

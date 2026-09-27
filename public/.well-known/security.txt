@@ -1,0 +1,4 @@
+Contact: mailto:daniel.butnar@gmail.com
+Expires: 2027-09-27T00:00:00.000Z
+Preferred-Languages: en, de, ro
+Canonical: https://danielbutnar.github.io/.well-known/security.txt

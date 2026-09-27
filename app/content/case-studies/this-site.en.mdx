@@ -1,0 +1,96 @@
+<Section id="job">
+
+I'm applying for React and Firebase roles, and I take on small projects for businesses. A portfolio for both has to prove the stack it talks about, so this site is built on it: React for every page, Firebase for everything that has to remember something.
+
+Two groups read it. Hiring teams want to see how I work: the structure, the tests, the decisions. Business owners want to know whether I can build their site, and how to reach me. The site is in English, German and Romanian, and it runs on GitHub Pages, which serves files and nothing else. So there is no server of my own: the security rules are the backend.
+
+</Section>
+
+<Section id="built">
+
+The design came first, in Claude Design: three directions, then every page for desktop and phone, before any code. The direction that won, "Timetable", uses condensed type, a work list that reads like a train timetable, and one yellow highlighter. The code was written with Claude Code. I review what ships, and the checks below run on every change.
+
+- Every public page prerendered to HTML at build time with React Router 8: 30 pages, ten in each language, each with hreflang links and its own Content Security Policy.
+- An inquiry form that changes with what you ask about (a project, a job, something else), checks every field as you type, and stores the inquiry in Cloud Firestore.
+- A status page that updates live when I open the inquiry and when I mark it answered.
+- A private inbox at /admin: Google sign-in, owner only, a live list with filters, statuses, private notes and delete.
+- Security rules with 27 tests against the Firestore emulator, 65 unit tests, and an end-to-end test in Chrome against the Auth and Firestore emulators. CI runs all three on every push.
+
+<Flow />
+
+<Shot name="this-site-inbox" kind="desktop" alt="The private inbox: a list of two sample inquiries and one opened, with a private note and buttons to answer, archive or delete." caption="The inbox with sample data from the emulators. Opening an inquiry marks it read." />
+
+</Section>
+
+<Section id="hard">
+
+### No server, and the form still has to be safe
+
+Anyone can call Firestore directly with the site's public config, skipping my form. So the form's checks are only for people; the rules are the check that counts.
+
+A new inquiry must have exactly the expected fields, each of the right type and length, a valid e-mail address, the status "new", the sender's own user ID, and a creation time equal to the server's clock. The owner may later change three fields and nothing else. The form and the rules share their limits: the rules tests import the same `LIMITS` object as the form, and test each limit and one character past it, so the two cannot drift apart.
+
+```
+// firestore.rules
+function isValidNewInquiry(data) {
+  return data.keys().hasAll(inquiryFields())
+    && data.keys().hasOnly(inquiryFields())
+    && data.kind in ["project", "job", "other"]
+    && isText(data.name, 1, 100)
+    && isText(data.message, 20, 2000)
+    // …
+    && data.uid == request.auth.uid
+    && data.createdAt == request.time
+    && expiresInAYear(data.expireAt);
+}
+```
+
+### One inquiry a minute, without a server
+
+A form without a rate limit invites a script that sends a thousand messages. Without a server, there is nowhere to count them. Firestore can count them, though.
+
+When you press Send, Firebase signs your browser in anonymously, so it has an ID. The inquiry is written in one batch with a second document, senders/your-ID, that holds the time of your last inquiry. The rule for the inquiry uses `getAfter()` to check that this batch also sets that time to now. The rule for the senders document refuses the update if the previous time is less than 60 seconds ago. Both documents are saved, or neither.
+
+```
+// firestore.rules
+match /senders/{uid} {
+  allow update: if request.auth != null
+    && request.auth.uid == uid
+    && request.resource.data.keys().hasOnly(["lastSentAt"])
+    && request.resource.data.lastSentAt == request.time
+    && request.time > resource.data.lastSentAt + duration.value(60, "s");
+}
+```
+
+This stops a careless loop, not a determined attacker, who can create new anonymous users. App Check would be the next layer.
+
+<Shot name="this-site-status" kind="desktop" alt="The status page after sending: received, waiting to be read, and a copy of what was sent." caption="The status page. Only the browser that sent the inquiry may read it." />
+
+### Firebase only when you need it
+
+The Firebase SDK is the largest dependency on the site, and most visitors never send an inquiry. So no page imports it at the top. The form loads the Firestore and Auth code with a dynamic `import()` when you press Send, and the status page when it opens.
+
+The home page ships about 130 KB of JavaScript, compressed, and no Firebase code at all. Pressing Send adds about 155 KB. The inbox, which needs Google sign-in, is a separate route that visitors never load. Fonts are self-hosted, and only their Latin subsets, which cover English, German and Romanian.
+
+### Data that deletes itself
+
+The privacy notice promises that an inquiry is deleted after 12 months, and a promise like that is easy to forget. So every inquiry carries an `expireAt` date, and a Firestore time-to-live policy deletes the document when that date passes. The client sets the date from its own clock, so the rule accepts it within a day either way. My private notes on an inquiry copy its `expireAt`, and the rules check that they match, so a note cannot outlive its inquiry.
+
+</Section>
+
+<Section id="results">
+
+- 27 security-rule tests pass against the Firestore emulator, and 65 unit tests pass (27 September 2026).
+- The end-to-end test passes all 12 checks: sending, validation, the rate limit, a stranger's browser refused, the owner's sign-in, and the status page changing live (27 September 2026).
+- 30 pages prerendered in three languages, with no horizontal scroll at 375 px and no console errors.
+- Home page: about 130 KB of JavaScript, compressed, with no Firebase code.
+
+</Section>
+
+<Section id="next">
+
+- Add App Check with reCAPTCHA Enterprise, so only this site can write to Firestore.
+- Send me an e-mail for each new inquiry. That needs a Cloud Function, which needs the paid Blaze plan.
+- Send inquiries with Firestore Lite, which is much smaller, and keep the full SDK only for the pages that update live.
+
+</Section>

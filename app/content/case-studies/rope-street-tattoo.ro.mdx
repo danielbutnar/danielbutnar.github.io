@@ -1,0 +1,86 @@
+<Section id="job">
+
+Provocarea Contra × Lovable le-a cerut participanților să transforme „pot să mă programez la tine?” în „ești programat”. Clientul l-am inventat eu și tot eu am scris brief-ul: Rope Street Tattoo, un studio cu un singur scaun în centrul vechi al Brașovului, unde o singură tatuatoare, Mara, face totul.
+
+În brief, Mara lucrează cu mănuși șase-șapte ore pe zi, așa că mesajele așteaptă până noaptea. Pentru orice ofertă de preț e nevoie de mărime, zonă, culoare și o imagine de referință. Ședințele durează între 45 de minute și 5 ore, deci intervalele fixe de o oră nu funcționează. Tatuajele cover-up și cele pe mâini, gât sau față nu au voie să se programeze niciodată automat. Cam o treime dintre clienți sunt turiști care scriu în engleză, germană sau română și stau două-trei zile.
+
+</Section>
+
+<Section id="built">
+
+Am scris brief-ul, regulile studioului, douăsprezece prompturi și câte o verificare pentru fiecare. Din ele, Lovable a generat aplicația. Uneltele care filmează clipul demo și îi pun vocea le-am scris eu.
+
+- O ușă de intrare: clientul descrie ideea în cuvintele și în limba lui și primește o durată, un interval de preț, un avans și doar orele în care încape lucrarea.
+- Un avans prin Stripe, în modul de test. După plată, cardul programării, un „stencil” violet cu linie întreruptă, devine cerneală plină.
+- O pagină privată pentru fiecare programare, unde clientul confirmă, mută, anulează, adaugă în calendar și semnează formularul de consimțământ, fără cont.
+- O zonă pentru proprietară, cu Today, Week și coada „Needs you”, unde un DM lipit în aplicație devine un răspuns cu preț, în limba clientului.
+- Un pilot automat pentru confirmări, reamintiri, eliberarea orelor, reumplerea lor din lista de așteptare și îngrijirea după tatuaj, cu un ceas demo care îl derulează înainte.
+
+<Shot name="rope-street-tattoo-price" kind="desktop" alt="Estimarea pentru un mesaj în germană: o ședință de 90 de minute, între 450 și 600 de lei și un avans de 150 de lei." caption="AI-ul completează câmpurile; prețul vine din regulile studioului." />
+
+</Section>
+
+<Section id="hard">
+
+### AI-ul citește, regulile decid
+
+Un preț de la un chatbot e o presupunere. La un tatuaj, o presupunere greșită înseamnă un client supărat sau o zi de câștig pierdută.
+
+Așa că AI-ul doar citește. Prin tool calling, returnează câmpuri: limba, zona, mărimea, culoarea, nivelul de detaliu, dacă e cover-up sau nu, zilele în care clientul e în oraș și un scor de încredere. Cod determinist de pe server transformă aceste câmpuri în cifre, după reguli pe care Mara le poate modifica: un tabel de mărimi de la 45 de minute la 4 ore, timp în plus pentru culoare, detalii fine și zone mai dificile, rotunjire în sus la 15 minute, 350 de lei pe oră și un interval de la 0,9 la 1,15 ori prețul așteptat. Tatuajele cover-up, cele pe mâini, degete, gât sau față, orice peste 25 cm și orice scor de încredere sub 0,6 ajung la Mara.
+
+Mesajul de test în germană cere un desen din linii negre, de 6 cm, pe gleznă. După reguli, asta înseamnă 75 de minute plus 15 % pentru gleznă, rotunjit în sus la 90: între 450 și 600 de lei, cu un avans de 150 de lei. Orice câmp modificat recalculează imediat, fără un al doilea apel la AI.
+
+### O săptămână de follow-up în două clicuri
+
+Juriul nu poate aștepta trei zile ca să vadă cum pleacă o reamintire.
+
+Fiecare funcție de pe server cere ora de la un singur ceas, iar în modul demo acel ceas e un timestamp salvat. Un singur runner execută, în ordine, tot ce a ajuns la termen între ultima lui rulare și noua oră: o cerere de confirmare cu 72 de ore înainte de ședință, o a doua reamintire la 48, iar la 24 de ore un interval neconfirmat e eliberat, avansul e păstrat și ora e oferită celor mai potriviți trei oameni de pe lista de așteptare. Fiecare acțiune are o cheie de deduplicare, iar mesajele sunt unice pe programare și tip, așa că dacă aceeași fereastră rulează de două ori, nu pleacă nimic nou.
+
+În testele mele pe site-ul live, „+1 day” a eliberat miercurea neconfirmată a Ioanei și i-a oferit-o lui Sam, nu Biancăi, care vrea doar sâmbăta. Sam a plătit, iar miercurea s-a umplut din nou.
+
+### Prompturi cu test atașat
+
+Un builder AI raportează că o funcționalitate e gata. Eu aveam nevoie să pot verifica.
+
+Fiecare dintre cele 12 prompturi se termină cu un rând „Done when”, care numește exact datele de intrare și rezultatele. Pentru ușa de intrare, mesajul în germană trebuia să dea un rezumat în germană, 1 h 30 min, între 450 și 600 de lei și ore doar de marți, 29 septembrie, până sâmbătă, 3 octombrie: ceasul demo arată luni, studioul tatuează de marți până sâmbătă, iar cel care a scris pleacă duminică. După fiecare prompt am verificat preview-ul și am scris prompturi de corectare pentru ce nu mergea, de exemplu un reset al demo-ului blocat de un foreign key sau un link dintr-un DM lipit care deschidea un pas gol.
+
+### Un demo filmat fără să se vadă cardul
+
+Clipul demo avea nevoie de un voice-over sincronizat cu imaginea și de plăți de test reale, fără să apară numele titularului de card tastat pe Stripe.
+
+Un script Python rostește fiecare replică a narațiunii cu Kokoro, un model de voce open-weights, și îi notează durata. Apoi un script Playwright controlează site-ul live și înregistrează cadre prin Chrome DevTools Protocol. Înainte de fiecare replică nouă, așteaptă să se termine cea anterioară, așa că vocea dă ritmul.
+
+```js
+// video/film.mjs
+async function say(id, vars = {}) {
+  if (!(id in SPOKEN)) throw new Error(`no voice line "${id}": run voice.py first`);
+  await done();
+  if (speakingUntil) await wait(PAUSE * 1000);
+  const text = NARRATION[id].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
+  markers.push({ type: "say", id, t: now(), text });
+  speakingUntil = now() + SPOKEN[id];
+  log(`say ${id} (${SPOKEN[id]} s)`);
+}
+```
+
+Pe fiecare pagină Stripe, înregistrarea se oprește până se termină plata. Un script de build taie aceste goluri, scurtează încărcările de pagină și așteptările după AI, apoi encodează rezultatul cu ffmpeg.
+
+</Section>
+
+<Section id="results">
+
+- Trimis pe Contra pe 27 septembrie 2026.
+- Verificarea site-ului live: PASS, 0 erori pe 13 pagini; fără overflow orizontal la 375, 768 sau 1440 px (27 septembrie 2026).
+- O repetiție completă pe site-ul live a trecut, inclusiv ambele plăți de test (27 septembrie 2026).
+- Istoricul aplicației merge de la 00:54 la 16:15, pe 27 septembrie 2026: 224 de commituri, 163 din 200 de credite Lovable.
+- Cifrele din dashboard-ul demo vin din date de test precompletate pentru un studio fictiv. Arată cum funcționează numărătoarea, nu rezultate reale.
+
+</Section>
+
+<Section id="next">
+
+- Trimiterea de mesaje reale. Deocamdată fiecare mesaj ajunge într-o căsuță de ieșire, iar WhatsApp și SMS sunt marcate ca simulate.
+- Confirmarea pe site-ul live a celor două corecturi pe care nu le-am putut vedea în acțiune: nota despre lista de așteptare de pe pagina unei programări plătite și resetarea automată a demo-ului partajat.
+- Mutarea badge-ului Lovable, care acoperă caseta de text de pe pagina principală la 375 px.
+
+</Section>

@@ -1,0 +1,95 @@
+<Section id="job">
+
+Serpentina Transfers este o firmă fictivă și conceptul meu de portofoliu pentru ce poate avea online o firmă mică de transferuri. Duce călători de la patru aeroporturi (București Otopeni, Brașov-Ghimbav, Sibiu și Cluj) la Brașov, Poiana Brașov, Bran, Predeal și Sinaia.
+
+În brief, mulți călători sunt germani sau austrieci, iar mulți rezervă noaptea târziu, de pe telefon. Așa că primul ecran trebuie să răspundă deodată la trei întrebări: cât costă, cum rezerv și cine mă ia. Site-ul trebuia să funcționeze în engleză, română și germană, să afișeze prețurile în lei pe paginile în română și să ruleze pe GitHub Pages, fără niciun server în spate.
+
+</Section>
+
+<Section id="built">
+
+Claude Design a propus două direcții vizuale. Am ales „Wayfinding grid”, care împrumută de la indicatoarele din aeroport: galben și negru, bare de secțiune numerotate, colțuri drepte și pancarta albă cu nume pe care o ridică șoferul la sosiri. Apoi am construit-o ca export static în Next.js 16.
+
+- Un preț fix pe primul ecran, pentru fiecare vehicul, în euro sau în lei pe paginile în română.
+- O pancartă care repetă numele călătorului în timp ce acesta îl tastează.
+- Rezervare în trei pași: căutarea zborului, în variantă demo, pasageri și bagaje, un vehicul potrivit, un retur opțional și un fișier de calendar la final.
+- Gestionarea rezervării: schimbarea orei de preluare sau anularea, cu regula de rambursare afișată înainte de confirmare.
+- Un panou pentru proprietar: cursele zilei, cu stări care urmează ceasul, alocarea șoferilor și un editor de prețuri.
+- 20 de pagini de rută pentru fiecare limbă, fiecare cu o hartă desenată din coordonate reale.
+
+Nu se încasează nimic și nu se trimite nimic. Rezervările rămân în browserul vizitatorului, iar fiecare pagină spune că firma nu este reală.
+
+<Shot name="serpentina-transfers-dashboard" kind="desktop" alt="Panoul proprietarului: cursele zilei cu stări, șoferi și un zbor întârziat." caption="Panoul proprietarului. Stările curselor urmează ceasul." />
+
+</Section>
+
+<Section id="hard">
+
+### Proprietarul schimbă un preț, iar tot site-ul se actualizează
+
+Un site static nu are bază de date. Totuși, editorul de prețuri din panoul proprietarului trebuie să schimbe fiecare preț de pe fiecare pagină: panoul de rezervare, ambele tabele de prețuri, pașii rezervării și paginile de rută.
+
+Tabelul editat stă în localStorage-ul browserului. Componentele îl citesc printr-un singur hook construit pe useSyncExternalStore din React. Snapshot-ul lui de server este tabelul implicit, așa că HTML-ul prerandat și primul render pe client coincid mereu, iar prețurile salvate le înlocuiesc pe cele implicite imediat după hydration. Snapshot-ul ține în cache tabelul parsat după string-ul brut, pentru că hook-ul trebuie să primească înapoi același obiect cât timp nu s-a schimbat nimic, altfel React randează în buclă.
+
+```ts
+// src/lib/prices.ts
+function snapshot(): PriceTable {
+  const raw = readRaw();
+  if (raw === cache.raw) return cache.table;
+  // …
+export function usePrices(): PriceTable {
+  return useSyncExternalStore(subscribe, snapshot, () => DEFAULT_PRICES);
+}
+```
+
+Un tabel salvat se folosește doar dacă fiecare rută are un preț în euro întregi, între 10 și 1.000. Fiecare funcție care afișează sau încasează un preț primește tabelul ca argument, așa că nicio componentă nu poate reveni pe tăcute la valorile implicite.
+
+### O ofertă, patru locuri pe pagină
+
+Pagina principală arată prețul în panoul de rezervare, într-o matrice pe desktop și pe un panou de afișaj pe telefon, iar pancarta arată numele călătorului. Dacă fiecare parte și-ar ține propria stare, ar ajunge să nu mai coincidă.
+
+Un singur context React ține oferta: aeroportul, destinația, pasagerii, numele și data. Alegerea unui preț în oricare dintre tabele încarcă ruta în formular și derulează pagina până la el, lin, dacă vizitatorul nu a oprit animațiile. Un anunț scurt le spune celor care folosesc un cititor de ecran ce rută s-a încărcat. „Rezervă acest transfer” duce aceeași stare în fluxul de rezervare, unde reguli testate aleg un vehicul potrivit: un sedan ia trei pasageri și trei valize, un break patru pasageri și cinci bagaje, iar pentru cinci până la opt oameni e nevoie de microbuz.
+
+### O hartă desenată din coordonate reale
+
+Voiam ca fiecare pagină de rută să arate drumul, fără tile-uri de hartă și fără un widget terț.
+
+Fiecare localitate și fiecare aeroport de pe hartă are longitudinea și latitudinea reală. Codul le proiectează în plan și scalează longitudinea cu cosinusul lui 45,6°, o latitudine aproape de mijlocul hărții, ca distanțele pe direcția est-vest să nu fie întinse. Fiecare rută e o listă de localități de pe drumul principal. Pentru o pagină de rută, codul ia dreptunghiul care încadrează ruta, îi adaugă o margine, îl lărgește la un cadru 4:3 și transmite un factor de scară, ca etichetele și marcajele să păstreze aceeași mărime pe ecran la orice zoom. Fiecare etichetă stă pe partea opusă față de următorul punct de pe rută.
+
+```ts
+// src/lib/route-map.ts
+const SCALE = 88; // px per degree of latitude
+const LON_SCALE = SCALE * Math.cos((45.6 * Math.PI) / 180);
+// …
+export function project(node: Node): { x: number; y: number } {
+  return { x: Math.round((node.lon - WEST) * LON_SCALE * 10) / 10, y: Math.round((NORTH - node.lat) * SCALE * 10) / 10 };
+}
+```
+
+<Shot name="serpentina-transfers-route" kind="desktop" alt="O pagină de rută cu harta drumului de la aeroportul Otopeni la Poiana Brașov." caption="Paginile de rută desenează drumul din coordonate reale, fără tile-uri de hartă." />
+
+### Un site static care se poartă ca o aplicație
+
+GitHub Pages servește fișiere și atât: fără headere, fără redirecționări, fără cod pe server.
+
+De aceea, Content Security Policy este un meta tag, care blochează totuși orice origine terță. Pagina rădăcină trimite spre site-ul în engleză printr-un meta refresh, iar URL-urile necunoscute primesc o pagină 404 adevărată. Paginile care citesc din stocarea browserului se randează după hydration, așa că HTML-ul nu contrazice niciodată React. O capcană a venit chiar din build: pe Windows, Next 16.3 scrie fișierele de prefetch cu nume greșite. Așa că deploy-ul se face doar din build-ul de Linux din GitHub Actions, după ce trec formatarea, tipurile, lintul și testele.
+
+</Section>
+
+<Section id="results">
+
+- Verificarea site-ului live: PASS, 0 erori pe toate cele 78 de pagini (27 septembrie 2026).
+- Rulări Lighthouse de laborator pe site-ul live (27 septembrie 2026): performanță 100 pe desktop, performanță între 73 și 94 pe telefon, de la o rulare la alta, accesibilitate 100 și bune practici 100 la fiecare rulare.
+- 34 de teste unitare, rulate la fiecare push pe main și la fiecare pull request.
+- 26 de pagini în fiecare dintre cele 3 limbi: pagina principală, rezervarea, gestionarea rezervării, panoul proprietarului, o pagină cu toate rutele, 20 de pagini de rută și studiul de caz.
+- axe verifică fiecare pagină la 375, 768 și 1440 px, iar fluxurile de rezervare și de anulare au fost testate doar cu tastatura.
+
+</Section>
+
+<Section id="next">
+
+- Adăugarea unui checkout Stripe real, în modul de test. Pentru asta e nevoie de un server, de exemplu pe Vercel, în loc de GitHub Pages.
+- Revizuirea textelor în română și germană; ambele sunt încă ciorne.
+- Mutarea testelor de browser în repo. Acum scripturile Playwright stau în afara lui, iar verificările obligatorii din repo sunt testele unitare plus verificarea site-ului.
+
+</Section>

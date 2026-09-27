@@ -1,0 +1,82 @@
+<Section id="job">
+
+Actul european privind accesibilitatea se aplică din 28 iunie 2025, iar Germania, Austria și România au fiecare propria lege care îl pune în aplicare. Voiam să știu cum stau de fapt magazinele din România și Germania, cu cifre pe care să le pot susține.
+
+Așa că pe 15 septembrie 2026 am scanat paginile principale a 44 de magazine online și furnizori de servicii cunoscuți, 24 din România și 20 din Germania, din comerț, telecom, bănci și transport. Rezultatele trebuiau să fie publice și utile fără să numească pe nimeni, iar uneltele trebuiau să fie destul de bune ca să le refolosesc pe propriile site-uri.
+
+</Section>
+
+<Section id="built">
+
+Un pipeline de scanare, un site al studiului în trei limbi și un set de unelte de QA care a crescut din amândouă.
+
+- Un script de audit care controlează Chrome prin Playwright, injectează axe-core 4.13 doar cu regulile WCAG 2.0 și 2.1 de nivel A și AA și înregistrează încălcările, elementele „needs review” și verificările de structură.
+- O pagină a studiului în engleză, germană și română, cu cifrele cheie, cele mai frecvente erori și un tabel anonimizat cu toate cele 42 de site-uri.
+- Un raport-model pentru o pagină principală anonimizată, cu dovezi, contraste de culoare măsurate și codul corectat pentru fiecare problemă găsită.
+- O pagină demo cu șase bariere, așa cum au fost găsite și după remediere, cu o citire simulată de cititor de ecran.
+- Scripturi care țin site-ul studiului la propriul standard.
+- site-qa: un workflow GitHub Actions public și reutilizabil, cu o verificare a site-ului și un design lint, folosit acum de celelalte site-uri statice ale mele.
+
+<Shot name="accessibility-study-results" kind="desktop" alt="Pagina studiului: cifrele cheie și un grafic cu bare al regulilor care pică cel mai des." caption="Studiul publicat. Fiecare cifră e reconstruită din rezultatele brute." />
+
+</Section>
+
+<Section id="hard">
+
+### Scanarea paginii din spatele bannerului de cookie-uri
+
+Majoritatea paginilor principale ale magazinelor se deschid cu un dialog de consimțământ. O scanare doar a dialogului spune ceva despre banner, nu despre magazin.
+
+Scriptul scanează pagina așa cum se încarcă. Apoi caută un buton de consimțământ după numele lui accesibil și încearcă etichetele de tip „refuz” în română, germană și engleză înaintea oricărei etichete de tip „accept”, ca să aleagă varianta care protejează confidențialitatea atunci când poate. Dacă apasă pe unul, scanează din nou.
+
+```js
+// tools/audit/audit.mjs
+out.asLanded = await runAxe(page);
+out.asLanded.summary = summarize(out.asLanded.violations);
+out.consentClicked = await dismissConsent(page);
+if (out.consentClicked) {
+  out.afterConsent = await runAxe(page);
+  out.afterConsent.summary = summarize(out.afterConsent.violations);
+}
+```
+
+Barierele anti-bot (pagini de eroare, pagini aproape goale, titluri ca „Just a moment”) sunt marcate ca blocate, în loc să primească un scor. Două site-uri germane au blocat accesul automat, de aceea studiul numără 42 de site-uri, nu 44.
+
+### Cifre care nu pot devia de la date
+
+Un astfel de studiu valorează ceva doar dacă fiecare cifră de pe pagină se potrivește cu rezultatele brute, în toate cele trei limbi, și niciun site nu e numit.
+
+Lista site-urilor și rezultatele cu nume stau într-un folder privat, ignorat de git. Un script citește rezumatul anonimizat și rescrie tabelul dintre două marcaje în paginile studiului în engleză, germană și română, traducând din mers numele sectoarelor, ale mărimilor și ale regulilor. Regulile proiectului interzic modificarea manuală a oricărei cifre din studiu: se rulează din nou pipeline-ul, se reconstruiesc tabelele, apoi se actualizează textul. Pe paginile publice, site-urile apar doar ca ID-uri precum RO-08, cu țara, sectorul și mărimea.
+
+### Un site despre accesibilitate trebuie să treacă propriul test
+
+Dacă aș publica rezultate despre accesibilitate pe o pagină care pică aceeași scanare, mi-aș anula singur argumentul.
+
+Un script de autoverificare încarcă fiecare pagină în Chrome și rulează axe cu regulile WCAG 2.2 AA și cele de bune practici adăugate, plus verificări pentru tagurile din head, un singur h1, linkul de salt la conținut, linkuri, erori în consolă și overflow la 375 px. axe e injectat prin Chrome DevTools Protocol, așa că propria Content Security Policy a paginii rămâne activă în timpul testului. Un al doilea script testează comportamentul: prima oprire la Tab trebuie să fie linkul de salt la conținut și trebuie să mute focusul pe conținutul principal, fiecare contur de focus trebuie să aibă cel puțin 2 px, iar meniul de mobil trebuie să fie inert când e închis și să returneze focusul la Escape. Exemplele stricate de pe pagina demo stau în containere inerte, așa că pagina rămâne conformă în timp ce arată erori.
+
+### O singură verificare pentru toate site-urile
+
+După studiu, am vrut aceleași verificări pe fiecare site pe care îl construiesc, nu câte o copie în fiecare repo.
+
+site-check generalizează autoverificarea. Servește un folder la fel ca GitHub Pages, parcurge până la 60 de pagini și le testează pe fiecare la 375, 768 și 1440 px: axe (cu contrastul în dark mode, când site-ul are o temă întunecată), tagurile din head, validitatea HTML, overflow, erorile din consolă și de CSP, linkurile stricate, fișierele prea mari și fișierele de deploy, precum robots.txt și pagina 404. Erorile pică jobul; avertismentele doar se afișează. design-lint scanează sursa cu 23 de metrici pentru abaterile de la design tokens și pentru aspectul generic, generat de AI. Funcționează ca un clichet: un număr poate scădea, dar nu poate crește niciodată. Ambele rulează dintr-un singur workflow GitHub Actions reutilizabil.
+
+</Section>
+
+<Section id="results">
+
+- 37 din cele 42 de pagini principale care au răspuns pică cel puțin o regulă WCAG 2.1 de nivel A sau AA: 88 % (scanarea din 15 septembrie 2026).
+- Toate cele 24 de pagini principale din România pică, cu 77 de elemente cu erori pe pagină, în medie (mediana 68). 13 din 18 pagini principale din Germania pică, cu 13 în medie (mediana 6).
+- 2.080 de elemente cu erori în total. Patru tipuri de reguli (contrastul textului, linkuri fără text, imagini fără text alternativ, butoane fără nume) adună 1.819 dintre ele, adică 87 %.
+- 21 din 42 au cel puțin o problemă critică și doar 11 din 42 oferă un link de salt la conținut.
+- De atunci, site-check a trecut cu 0 erori pe 9 pagini din Brasov Private Tours (25 septembrie 2026), 78 de pagini din Serpentina Transfers și 13 pagini din Rope Street Tattoo (27 septembrie 2026).
+
+</Section>
+
+<Section id="next">
+
+- Testarea manuală a unui eșantion. Verificările automate găsesc doar o parte din bariere, estimată de obicei la 30–40 %, deci fiecare cifră de aici e o limită inferioară.
+- Extinderea dincolo de pagina principală. Au fost scanate doar paginile principale, pe desktop; paginile de produs și cele de finalizare a comenzii au de obicei mai multe erori, nu mai puține.
+- Repetarea studiului în 2027, pentru o comparație la un an distanță.
+- Mutarea agregării în repo, ca script separat.
+
+</Section>

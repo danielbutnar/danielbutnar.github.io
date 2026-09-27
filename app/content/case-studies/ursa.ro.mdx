@@ -1,0 +1,93 @@
+<Section id="job">
+
+Ursa este un refugiu fictiv de piatră la 1.842 m în Munții Făgăraș, cu douăsprezece paturi, la patru ore de mers pe jos. L-am făcut ca proiect de portofoliu, ca să arăt cât de mult poate duce un site mic de cazare fără fotografii de stoc.
+
+Un refugiu la patru ore de drum vinde două lucruri, urcarea și noaptea de acolo de sus, așa că pagina urmează aceeași ordine. Începe cu o hartă de drumeție din parcare, urcă prin pădure, se oprește la planul refugiului și se termină în cerul de noapte de deasupra crestei, unde e formularul de rezervare. Site-ul trebuia să rămână ușor și privat: fără framework, fără cookie-uri, fără cereri către terți.
+
+</Section>
+
+<Section id="built">
+
+O singură pagină lungă în HTML, CSS și JavaScript simplu, plus un colofon care explică cum a fost făcută. Fiecare imagine de pe ea e desenată din date.
+
+- O hartă mare, în partea de sus a paginii, cu un munte generat: umbrirea reliefului, pădure, curbe de nivel, un pârâu și trei trasee marcate. Cu cursorul pe ea se citesc altitudinea și terenul de dedesubt.
+- Un altimetru și un profil de altitudine care urmăresc poziția de citire, ca bandă fixă pe telefon.
+- Un plan în SVG: cursorul pe o cameră din listă o evidențiază pe plan.
+- Un cer de noapte cu stele generate dintr-un seed, Calea Lactee și Carul Mare, plus apusul, lăsarea întunericului și faza lunii din seara asta, pentru refugiu.
+- Un calendar de rezervare construit din butoane radio, cu cele douăsprezece paturi desenate pentru fiecare noapte și un total care se actualizează live. Săgețile de pe tastatură trec de la o noapte la alta și le sar pe cele pline. Rulează în mod concept și nu trimite nimic.
+- Un mod întunecat care transformă harta într-o hartă de noapte.
+
+<Shot name="ursa-night" kind="desktop" alt="Secțiunea cu cerul de noapte: stele generate dintr-un seed, Carul Mare și un card cu apusul și faza lunii din seara asta." caption="Cerul de noapte e calculat pentru poziția și altitudinea refugiului." />
+
+</Section>
+
+<Section id="hard">
+
+### Același munte la fiecare vizită
+
+Un munte aleatoriu ar arăta altfel la fiecare vizită, iar pagina îi citează altitudinile și distanțele.
+
+Harta pornește de la un generator de numere aleatorii cu seed (seed 1842), care amestecă tabelul din spatele simplex noise. Mai multe straturi de zgomot suprapuse dau terenul accidentat. Peste el, codul modelează peisajul: o linie de creastă, o vale glaciară cu un circ în capăt, un picior lung de munte și un vârf. Apoi rescalează fiecare altitudine, ca refugiul să stea la exact 1.842 m, și aplatizează un mic tăpșan sub cabană.
+
+```js
+// assets/js/terrain.js
+const K = (REFUGE_H - FLOOR) / (raw(0, 0) - FLOOR);
+function height(x, y) {
+  let h = FLOOR + (raw(x, y) - FLOOR) * K;
+  h += (REFUGE_H - h) * 0.75 * Math.exp(-(x * x + y * y) / 0.045); // the bench the refuge sits on
+  const low = FLOOR + 30;
+  return h < low ? low - (low - h) * 0.15 : h;
+}
+```
+
+Pentru că terenul e fix, și cifrele lui sunt fixe. O unitate de hartă e setată la 1,72 km, ceea ce face traseul roșu de 7,4 km. Urcările, celelalte două trasee și altitudinea vârfului, de 2.236 m, au fost apoi citite de pe harta generată și trecute în text.
+
+### Poteci care urcă în serpentine, ca cele adevărate
+
+O linie dreaptă de la parcare la refugiu ar urca direct pe pantă. Potecile adevărate merg în zigzag.
+
+Traseele sunt găsite cu căutarea A* pe o grilă de 223 pe 214 altitudini. Fiecare pas poate merge în 16 direcții, inclusiv în mutări de cal, deci potecile nu sunt limitate la unghiuri de 45°. Un pas costă lungimea lui înmulțită cu unu plus o penalizare pentru pantă. Pe traseele ușoare, penalizarea crește încet, apoi brusc peste o pantă de 26 %, așa că algoritmul preferă o potecă mai lungă uneia abrupte.
+
+```js
+// assets/js/terrain.js
+const run = Math.hypot(dx, dy) * step;
+const grade = Math.abs(h[m] - h[n]) / (run * 1000);
+const c = cost[n] + run * (1 + penalty(grade));
+// …
+const easy = (g) => 9 * g * g + (g > 0.26 ? 380 * (g - 0.26) ** 2 : 0);
+```
+
+Drumul brut de pe grilă e apoi simplificat cu algoritmul Douglas–Peucker, care elimină treptele grilei, dar păstrează virajele, și netezit cu trei treceri ale algoritmului lui Chaikin de tăiere a colțurilor.
+
+<Shot name="ursa-routes" kind="desktop" alt="Trei trasee marcate, cu profilurile lor de altitudine pe aceeași scară." caption="Trei trasee găsite prin căutare A*, cu profiluri citite de pe teren." />
+
+### Calcule grele fără să înghețe pagina
+
+Umbrirea reliefului și curbele de nivel pentru o hartă pe tot ecranul cer mult calcul, iar totul rulează pe dispozitivul vizitatorului.
+
+terrain.js rulează de două ori: ca script al paginii, care desenează, și ca Web Worker, încărcat de la același URL, care face calculele. Worker-ul construiește terenul o singură dată, apoi răspunde la fiecare cerere de vizualizare cu pixelii umbririi și cu segmentele curbelor de nivel trasate prin marching squares, trimise înapoi ca buffere transferabile, ca să nu se copieze nimic. Dacă worker-ele nu sunt disponibile, pagina face singură calculele. Culorile hărții vin din custom properties CSS, așa că modul întunecat stă în stylesheet. Cu reducerea mișcării activă, harta finală apare imediat, în loc să crească curbă cu curbă.
+
+### Cerul din seara asta, calculat în browser
+
+Cardul „Tonight above Ursa” arată apusul de azi, sfârșitul crepusculului astronomic și faza lunii la refugiu.
+
+Pagina calculează poziția soarelui cu metoda standard de precizie redusă folosită de NOAA și SunCalc, exactă la un minut-două. Coboară și orizontul pentru altitudinea refugiului, pentru că de la 1.842 m soarele se vede apunând puțin mai târziu decât din vale. Faza lunii vine din durata lunii sinodice, numărată de la o lună nouă cu dată cunoscută. Canvasul cu stele se construiește doar când secțiunea se apropie. Doar stelele mai strălucitoare sclipesc, și doar cât timp secțiunea e pe ecran. Un buton le oprește, iar cu reducerea mișcării activă nu pornesc deloc.
+
+</Section>
+
+<Section id="results">
+
+- Cele trei trasee, citite de pe teren: roșu, 7,4 km și 1.202 m de urcare; albastru, 8,0 km și 1.127 m; galben, 4,0 km și 394 m. Vârful: 2.236 m.
+- Cele trei scripturi au împreună 63.532 de octeți înainte de compresie, fără nicio bibliotecă (măsurat pe 27 septembrie 2026).
+- Patru pagini fără dependențe la runtime, cookie-uri, analytics sau cereri către terți. Pe fiecare pagină, Content Security Policy permite un singur script inline, după hash-ul lui.
+- Din 23 septembrie 2026, fiecare push pe main rulează în CI verificarea comună a site-urilor.
+
+</Section>
+
+<Section id="next">
+
+- Conectarea formularului de rezervare la un serviciu real de formulare. Configurația are deja un loc pregătit pentru el, iar originea lui trebuie apoi adăugată în Content Security Policy.
+- Textul trebuie ținut în pas cu terenul: dacă se schimbă codul terenului, altitudinile, cifrele traseelor și profilurile trebuie citite din nou.
+- Salvarea în repo a unui rezultat Lighthouse și axe, cu dată. Verificarea din CI rulează, dar încă nu e notat niciun rezultat.
+
+</Section>

@@ -1,0 +1,54 @@
+{
+  "name": "danielbutnar.github.io",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "react-router dev --port 5183",
+    "build": "react-router build && node scripts/postbuild.mjs",
+    "build:e2e": "react-router build --mode emulators && node scripts/postbuild.mjs --emulators",
+    "preview": "node scripts/serve.mjs build/client 5184",
+    "typecheck": "react-router typegen && tsc",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-portfolio \"vitest run --config vitest.rules.config.ts\"",
+    "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-portfolio \"node tests/e2e/inquiry-flow.mjs\"",
+    "check": "node --run typecheck && node --run lint && node --run test",
+    "emulators": "firebase emulators:start --project demo-portfolio",
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "dependencies": {
+    "@react-router/node": "8.4.0",
+    "firebase": "12.19.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "8.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@firebase/rules-unit-testing": "5.0.2",
+    "@fontsource-variable/anybody": "5.3.0",
+    "@fontsource-variable/hanken-grotesk": "5.3.0",
+    "@mdx-js/rollup": "3.1.1",
+    "@react-router/dev": "8.4.0",
+    "@types/mdx": "2.0.14",
+    "@types/node": "24.19.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "10.11.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "firebase-tools": "15.31.0",
+    "globals": "17.12.0",
+    "playwright-core": "1.63.0",
+    "prettier": "3.9.9",
+    "sharp": "0.35.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}

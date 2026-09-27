@@ -1,0 +1,93 @@
+<Section id="job">
+
+Ursa ist eine fiktive Steinhütte auf 1.842 m im Făgăraș-Gebirge, mit zwölf Lagerplätzen und vier Stunden Zustieg. Ich habe sie als Portfolio-Stück gebaut, um zu zeigen, wie viel die kleine Website einer Unterkunft ohne Stockfotos leisten kann.
+
+Eine Hütte vier Stunden von der Straße entfernt verkauft zwei Dinge: den Aufstieg und die Nacht oben. Die Seite folgt dieser Reihenfolge. Sie beginnt mit einer Wanderkarte am Parkplatz, steigt durch den Wald auf, macht Halt am Grundriss der Hütte und endet im Nachthimmel über dem Grat, wo das Buchungsformular steht. Die Website sollte leicht und privat bleiben: kein Framework, keine Cookies, keine Anfragen an Dritte.
+
+</Section>
+
+<Section id="built">
+
+Eine lange Seite in reinem HTML, CSS und JavaScript, dazu ein Kolophon, das erklärt, wie sie entstanden ist. Jedes Bild darauf ist aus Daten gezeichnet.
+
+- Eine Hero-Karte eines generierten Bergs mit Schummerung, Wald, Höhenlinien, einem Bach und drei markierten Wegen. Zeigt man darauf, erscheinen Höhe und Untergrund an dieser Stelle.
+- Ein Höhenmesser und ein Höhenprofil, die der Leseposition folgen, am Handy als mitlaufende Leiste.
+- Ein Grundriss in SVG: Zeigt man in der Liste auf einen Raum, leuchtet er im Plan auf.
+- Ein Nachthimmel mit Sternen aus einem festen Seed, der Milchstraße und dem Großen Wagen, dazu der heutige Sonnenuntergang, der Einbruch der Dunkelheit und die Mondphase an der Hütte.
+- Ein Buchungskalender aus Radiobuttons, der für jede Nacht die zwölf Lagerplätze zeichnet, mit einer live berechneten Summe. Die Pfeiltasten wechseln zwischen den Nächten und überspringen ausgebuchte. Er läuft im Konzeptmodus und verschickt nichts.
+- Ein Dark Mode, der die Karte in eine Nachtkarte verwandelt.
+
+<Shot name="ursa-night" kind="desktop" alt="Der Abschnitt mit dem Nachthimmel: Sterne aus festem Seed, der Große Wagen und eine Infokarte mit Sonnenuntergang und Mondphase für heute Nacht." caption="Der Nachthimmel wird für Lage und Höhe der Hütte berechnet." />
+
+</Section>
+
+<Section id="hard">
+
+### Bei jedem Besuch derselbe Berg
+
+Ein zufälliger Berg sähe bei jedem Besuch anders aus, und die Seite nennt seine Höhen und Entfernungen.
+
+Die Karte beginnt mit einem Zufallszahlengenerator mit festem Seed (1842), der die Tabelle hinter dem Simplex-Noise mischt. Mehrere Schichten Noise ergeben das raue Gelände. Darauf formt der Code die Landschaft: einen Grat, ein Gletschertal mit einem Kar am Talschluss, einen langen Sporn und einen Gipfel. Dann skaliert er alle Höhen so um, dass die Hütte auf genau 1.842 m liegt, und ebnet unter der Hütte einen kleinen Absatz ein.
+
+```js
+// assets/js/terrain.js
+const K = (REFUGE_H - FLOOR) / (raw(0, 0) - FLOOR);
+function height(x, y) {
+  let h = FLOOR + (raw(x, y) - FLOOR) * K;
+  h += (REFUGE_H - h) * 0.75 * Math.exp(-(x * x + y * y) / 0.045); // the bench the refuge sits on
+  const low = FLOOR + 30;
+  return h < low ? low - (low - h) * 0.15 : h;
+}
+```
+
+Weil das Gelände feststeht, stehen auch seine Zahlen fest. Eine Karteneinheit entspricht 1,72 km, damit ist die rote Route 7,4 km lang. Die Anstiege, die beiden anderen Routen und die Gipfelhöhe von 2.236 m habe ich dann aus der generierten Karte abgelesen und in den Text übernommen.
+
+### Serpentinen wie auf echten Wegen
+
+Eine gerade Linie vom Parkplatz zur Hütte liefe direkt den Hang hinauf. Echte Wege laufen im Zickzack.
+
+Die Routen findet eine A*-Suche über ein Raster aus 223 mal 214 Höhenwerten. Jeder Schritt kann in 16 Richtungen gehen, auch im Rösselsprung, damit die Wege nicht auf 45°-Winkel beschränkt sind. Ein Schritt kostet seine Länge mal eins plus einen Aufschlag für seine Steigung. Auf den leichten Routen wächst der Aufschlag erst sanft und oberhalb von 26 % Steigung dann steil, deshalb nimmt die Suche lieber einen längeren Weg als einen steilen.
+
+```js
+// assets/js/terrain.js
+const run = Math.hypot(dx, dy) * step;
+const grade = Math.abs(h[m] - h[n]) / (run * 1000);
+const c = cost[n] + run * (1 + penalty(grade));
+// …
+const easy = (g) => 9 * g * g + (g > 0.26 ? 380 * (g - 0.26) ** 2 : 0);
+```
+
+Anschließend dünnt der Douglas-Peucker-Algorithmus den rohen Rasterpfad aus: Er entfernt die Treppenstufen des Rasters, behält aber die Kurven. Danach glätten ihn drei Durchgänge Corner Cutting nach Chaikin.
+
+<Shot name="ursa-routes" kind="desktop" alt="Drei markierte Wege mit ihren Höhenprofilen im selben Maßstab." caption="Drei Routen, gefunden per A*-Suche, mit Profilen, die direkt aus dem Gelände abgelesen sind." />
+
+### Schwere Mathematik, ohne dass die Seite einfriert
+
+Schummerung und Höhenlinien für eine bildschirmfüllende Karte kosten echte Rechenarbeit, und alles davon läuft auf dem Gerät der Besucher.
+
+terrain.js läuft zweimal: als Seitenskript, das zeichnet, und als Web Worker von derselben URL, der rechnet. Der Worker baut das Gelände einmal auf und beantwortet dann jede Anfrage für einen Kartenausschnitt mit Schummerungspixeln und Höhenliniensegmenten, die per Marching Squares nachgezeichnet sind. Er schickt sie als Transferable Buffers zurück, sodass nichts kopiert wird. Gibt es keine Worker, erledigt die Seite die Arbeit selbst. Die Farben der Karte kommen aus CSS Custom Properties, der Dark Mode steckt also im Stylesheet. Mit reduzierter Bewegung erscheint die fertige Karte sofort, statt sich Höhenlinie für Höhenlinie aufzubauen.
+
+### Ein Himmel für heute Nacht, berechnet im Browser
+
+Die Infokarte „Tonight above Ursa“ zeigt den heutigen Sonnenuntergang, das Ende der astronomischen Dämmerung und die Mondphase an der Hütte.
+
+Die Seite berechnet den Sonnenstand mit dem gängigen Näherungsverfahren, das auch NOAA und SunCalc nutzen, auf ein bis zwei Minuten genau. Außerdem senkt sie den Horizont für die Höhe der Hütte ab, denn auf 1.842 m sieht man die Sonne etwas später untergehen als im Tal. Die Mondphase ergibt sich aus der Länge des synodischen Monats, gezählt ab einem bekannten Neumond. Das Canvas mit den Sternen wird erst aufgebaut, wenn der Abschnitt in die Nähe kommt. Nur die helleren Sterne funkeln, und nur solange der Abschnitt zu sehen ist. Ein Button hält sie an, und bei reduzierter Bewegung starten sie gar nicht erst.
+
+</Section>
+
+<Section id="results">
+
+- Die drei Routen, abgelesen aus dem Gelände: Rot 7,4 km mit 1.202 m Aufstieg, Blau 8,0 km mit 1.127 m, Gelb 4,0 km mit 394 m. Gipfel 2.236 m.
+- Alle drei Skripte zusammen: 63.532 Bytes vor der Komprimierung, ohne Bibliotheken (gemessen am 27. September 2026).
+- Vier Seiten ohne Laufzeitabhängigkeiten, Cookies, Analytics oder Anfragen an Dritte. Eine Content Security Policy auf jeder Seite erlaubt genau ein Inline-Skript, über dessen Hash.
+- Seit dem 23. September 2026 läuft bei jedem Push auf main der gemeinsame Site-Check in der CI.
+
+</Section>
+
+<Section id="next">
+
+- Das Buchungsformular an einen echten Formulardienst anbinden. Die Konfiguration hat schon einen Platz dafür, und die Origin des Dienstes muss dann in die Content Security Policy aufgenommen werden.
+- Den Text mit dem Gelände synchron halten: Ändert sich der Geländecode, müssen Höhen, Routenwerte und Profile neu abgelesen werden.
+- Ein datiertes Lighthouse- und axe-Ergebnis im Repository festhalten. Der CI-Check läuft, aber noch ist kein Ergebnis dokumentiert.
+
+</Section>

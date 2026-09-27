@@ -1,0 +1,92 @@
+<Section id="job">
+
+Brasov Private Tours ist ein Unternehmen in Brașov, das private Tagesausflüge und Flughafentransfers mit eigenem Auto und Fahrer anbietet. Gäste müssen einen Ausflug, einen Tag, eine Abholzeit und ein Auto wählen, den echten Preis sehen und entweder beim Fahrer oder online bezahlen. Jedes Auto fährt immer nur eine Tour gleichzeitig, deshalb darf dasselbe Auto nie zweimal für dieselben Stunden verkauft werden.
+
+Das Unternehmen brauchte einen Admin-Bereich auf Rumänisch, um Anfragen zu bestätigen, Tage zu sperren, Preise zu ändern und Kartenzahlungen zu erstatten. Die Website sollte auf Englisch, Rumänisch, Italienisch und Spanisch laufen. Die Links der alten Website mussten weiter funktionieren, und die rumänischen Vorgaben zu Verbraucher- und Datenschutz waren einzuhalten.
+
+</Section>
+
+<Section id="built">
+
+Eine Buchungswebsite mit Next.js, einer Postgres-Datenbank, Zahlungen über Stripe und einem Admin-Bereich auf Rumänisch. Jeder „Buchen“-Button öffnet dasselbe Buchungsformular als Drawer, und ein Button unten nennt immer den nächsten fehlenden Schritt, etwa „Datum wählen“.
+
+- Verfügbarkeitsregeln als reine, getestete Funktionen: eine Fahrt pro Auto, 30 Minuten Puffer, Abholung von 07:00 bis 22:00 Uhr, mindestens eine Stunde Vorlauf, bis zu 12 Monate im Voraus.
+- Saisonale Ausflüge und Transfers zum Flughafen Bukarest, die das Auto für den ganzen Tag belegen, weil Flugverspätungen den Rest des Tages unplanbar machen.
+- Bezahlung beim Fahrer in bar oder mit Karte oder online über Stripe Checkout, mit automatischer Erstattung bei Stornierung.
+- Ein Admin-Bereich zum Bestätigen, Stornieren mit Erstattung, Sperren von Tagen, Ändern von Preisen und Ausmustern von Autos, ohne dass alte Buchungen kaputtgehen.
+- Vier Sprachen mit hreflang, Sitemap, strukturierten Daten und 301-Weiterleitungen von den alten URLs.
+- Ein nächtlicher Job, der Gästedaten nach den Fristen der Datenschutzerklärung löscht.
+- 60 CC-lizenzierte Fotos von Wikimedia Commons, selbst gehostet als WebP, mit Bildnachweisen.
+
+<Shot name="brasov-private-tours-booking" kind="desktop" alt="Das Buchungsformular, als Drawer über der Startseite geöffnet, mit einem Kalender der freien Tage." caption="Ein Buchungsformular für jeden Ausflug. Der Button unten nennt den nächsten Schritt." />
+
+</Section>
+
+<Section id="hard">
+
+### Zwei Gäste, ein Auto, derselbe Abend
+
+Wenn zwei Personen in derselben Sekunde für dasselbe Auto und dieselbe Uhrzeit auf „Buchen“ drücken, zeigen beide Bildschirme den Termin als frei an. Bekommen kann ihn nur einer.
+
+Jede Buchung wird in einer Postgres-Transaktion geschrieben, die zuerst Advisory Locks setzt: einen für das Datum und je einen für die E-Mail-Adresse, die Telefonnummer und die gehashte IP des Gastes. Innerhalb der Locks liest der Code den Tag noch einmal, prüft den Termin erneut und wendet die Rate Limits an. Eine frühere Version hat die Buchungen außerhalb der Transaktion gezählt, und parallele Anfragen sahen alle denselben Zählerstand und kamen durch. Die Locks werden in sortierter Reihenfolge gesetzt, deshalb können zwei Transaktionen nie ewig aufeinander warten.
+
+```ts
+// src/lib/bookings.ts
+async function lockBookingKeys(tx: Prisma.TransactionClient, keys: string[]) {
+  for (const key of [...new Set(keys)].sort()) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  }
+}
+```
+
+Dieselbe Transaktion liest den aktuellen Preis. Kostet das freie Auto inzwischen mehr als die Summe, die der Gast gesehen hat, bricht die Buchung ab, statt mehr zu berechnen.
+
+### Eine Zahlung, die kommt, wenn das Auto schon weg ist
+
+Eine Buchung mit Kartenzahlung hält ihr Auto etwa 42 Minuten lang: eine Stripe-Checkout-Session von 32 Minuten plus 10 Minuten Kulanz. Der Webhook von Stripe kann zu spät kommen oder doppelt.
+
+Die Funktion, die eine Buchung als bezahlt markiert, darf beliebig oft laufen, und sowohl der Webhook als auch die Erfolgsseite rufen sie auf. Unter dem Datums-Lock prüft sie, ob eine andere Buchung das Auto nach Ablauf der Reservierung übernommen hat. Falls ja, wird die Buchung storniert, das Geld geht automatisch zurück, und Gast und Unternehmen werden benachrichtigt. Die Erstattung trägt einen Idempotenzschlüssel von Stripe, sodass ein erneuter Versuch nie doppelt erstattet. Solange noch Geld zurückzuzahlen ist, antwortet der Webhook mit einem Fehler, damit Stripe es weiter versucht.
+
+### Die E-Mail, die genau einmal rausgeht
+
+Webhook und Erfolgsseite kommen oft im selben Moment an. Ohne Absicherung bekommt der Gast zwei Buchungsbestätigungen oder gar keine, wenn der Server mittendrin stoppt.
+
+Der Datensatz der Buchung trägt eine Markierung wie „confirmed: pending“, geschrieben in derselben Transaktion wie die Statusänderung. Der Versand sichert sie sich mit einem bedingten Update, das „pending“ gegen „sending“ tauscht. Nur der Aufruf, der den Datensatz tatsächlich geändert hat, verschickt die E-Mail.
+
+```ts
+// src/lib/payments.ts
+// Claim the send: only the call that swaps the marker sends, the other one leaves it alone.
+const { count } = await prisma.booking.updateMany({ where: { id: current.id, emailError: pendingMark(owed) }, data: { emailError: sendingMark(owed) } });
+if (count === 1) {
+  const kind = current.conflict ? "conflict" : "confirmed";
+  await sendBookingEmails(current, await tourTitle(current.tourSlug, current.locale), kind);
+}
+```
+
+Was nicht verschickt wurde, erscheint im Admin-Bereich mit einem Button zum erneuten Senden.
+
+### Tests, die keine echten Buchungen anfassen können
+
+Die Integrations- und End-to-End-Tests legen Buchungen an und löschen sie, deshalb dürfen sie nie die Produktivdatenbank erreichen. Bei einem Code-Review ist ein Setup aufgefallen, in dem die End-to-End-Tests einen Entwicklungsserver wiederverwenden konnten, der mit ihr verbunden war.
+
+Jetzt lehnt eine Prüfung jeden Datenbank-Host ab, der nicht localhost oder ein ausdrücklich benannter Test-Host ist. Die Playwright-Konfiguration führt sie aus, bevor irgendein Server startet, startet dann einen eigenen Dev-Server mit der geprüften URL und nutzt einen bereits laufenden nur auf ausdrücklichen Wunsch. In der CI laufen beide Test-Suites gegen einen Postgres-16-Service-Container.
+
+</Section>
+
+<Section id="results">
+
+- 79 Unit-Tests, 24 Integrationstests und 16 End-to-End-Tests laufen durch, und die CI auf main ist grün (26. September 2026).
+- Site-Check der Live-Website: PASS, 0 Fehler auf 9 Seiten (25. September 2026).
+- Der Header wurde in 4 Sprachen bei je 29 Breiten geprüft (26. September 2026).
+- Fotos, die größer angezeigt wurden, als die Datei hergibt: 16 von 99 vor einer Korrektur, 0 von 104 danach (26. September 2026).
+- Webfonts von 481 KB auf rund 150 KB verkleinert (26. September 2026).
+
+</Section>
+
+<Section id="next">
+
+- Start auf der eigenen Domain des Unternehmens, mit echten Kartenzahlungen über sein eigenes Stripe-Konto.
+- Die restlichen alten URLs weiterleiten, die noch auf einer 404 landen.
+- Die ersten echten Buchungen beobachten und die Verfügbarkeitsregeln gemeinsam mit dem Unternehmen feinjustieren.
+
+</Section>

@@ -1,0 +1,92 @@
+<Section id="job">
+
+Brasov Private Tours este o firmă din Brașov care face excursii private de o zi și transferuri la aeroport, cu mașină și șofer proprii. Oaspeții trebuie să aleagă o excursie, o zi, o oră de preluare și o mașină, să vadă prețul real și să plătească fie șoferului, fie online. Fiecare mașină face o singură cursă la un moment dat, așa că aceeași mașină nu poate fi vândută niciodată de două ori pentru aceleași ore.
+
+Firma avea nevoie de un panou de administrare în română, din care să confirme cererile, să blocheze zile, să schimbe prețurile și să ramburseze plățile cu cardul. Site-ul trebuia să funcționeze în engleză, română, italiană și spaniolă, să nu strice linkurile de pe site-ul vechi și să respecte regulile din România privind protecția consumatorului și protecția datelor.
+
+</Section>
+
+<Section id="built">
+
+Un site de rezervări în Next.js, cu bază de date Postgres, plăți prin Stripe și panou de administrare în română. Fiecare buton „Rezervați” deschide același formular de rezervare într-un panou glisant, iar un singur buton din partea de jos numește mereu următorul pas care lipsește, de exemplu „Alegeți o dată”.
+
+- Regulile de disponibilitate, ca funcții pure și testate: o singură cursă pe mașină, o marjă de 30 de minute, preluări în intervalul 07:00–22:00, rezervare cu cel puțin o oră înainte, cu cel mult 12 luni în avans.
+- Excursii sezoniere și transferuri la aeroportul din București care țin mașina ocupată toată ziua, pentru că întârzierile zborurilor fac restul zilei imprevizibil.
+- Plata la șofer, în numerar sau cu cardul, ori plata online prin Stripe Checkout, cu rambursare automată la anulare.
+- Un panou de administrare din care firma confirmă, anulează cu rambursare, blochează zile, modifică prețuri și scoate mașini din uz fără să strice rezervările vechi.
+- Patru limbi cu hreflang, sitemap, date structurate și redirecționări 301 de la URL-urile vechi.
+- Un job care rulează în fiecare noapte și șterge datele oaspeților după termenele din politica de confidențialitate.
+- 60 de fotografii cu licență CC de pe Wikimedia Commons, găzduite pe site în format WebP, cu autorii menționați.
+
+<Shot name="brasov-private-tours-booking" kind="desktop" alt="Formularul de rezervare deschis într-un panou glisant peste pagina principală, cu un calendar al zilelor libere." caption="Un singur formular de rezervare pentru toate excursiile. Butonul de jos numește pasul următor." />
+
+</Section>
+
+<Section id="hard">
+
+### Doi oaspeți, o mașină, aceeași seară
+
+Dacă doi oameni apasă „Rezervați” pentru aceeași mașină și aceeași oră în aceeași secundă, ambele ecrane arată intervalul ca liber. Doar unul dintre ei îl poate primi.
+
+Fiecare rezervare se scrie într-o tranzacție Postgres care ia mai întâi advisory locks: unul pentru dată și câte unul pentru e-mailul, telefonul și hash-ul IP-ului oaspetelui. Sub aceste lock-uri, codul citește din nou ziua, verifică din nou intervalul și aplică limitele de cereri. O versiune mai veche număra rezervările în afara tranzacției, iar cererile trimise în paralel vedeau toate aceeași numărătoare și treceau toate. Lock-urile se iau în ordine sortată, așa că două tranzacții nu se pot aștepta niciodată una pe alta la nesfârșit.
+
+```ts
+// src/lib/bookings.ts
+async function lockBookingKeys(tx: Prisma.TransactionClient, keys: string[]) {
+  for (const key of [...new Set(keys)].sort()) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  }
+}
+```
+
+Aceeași tranzacție citește prețul curent. Dacă mașina liberă costă acum mai mult decât totalul pe care l-a văzut oaspetele, rezervarea se oprește în loc să încaseze mai mult.
+
+### O plată care ajunge după ce mașina a fost luată
+
+O rezervare cu plata prin card ține mașina blocată aproximativ 42 de minute: o sesiune Stripe Checkout de 32 de minute plus 10 minute de grație. Webhook-ul Stripe poate ajunge târziu sau de două ori.
+
+Funcția care marchează o rezervare ca plătită poate rula de mai multe ori fără risc, iar o apelează atât webhook-ul, cât și pagina de după plată. Sub lock-ul pe dată, verifică dacă altă rezervare a luat mașina după ce a expirat blocarea. Dacă da, rezervarea se anulează, banii se returnează automat, iar oaspetele și firma sunt anunțați. Rambursarea are o cheie de idempotență Stripe, așa că o reîncercare nu rambursează niciodată de două ori. Cât timp mai există o sumă datorată, webhook-ul răspunde cu o eroare, ca Stripe să reîncerce în continuare.
+
+### E-mailul care pleacă exact o dată
+
+Webhook-ul și pagina de după plată ajung adesea în același moment. Dacă nu e tratat atent, oaspetele primește două e-mailuri „rezervare confirmată” sau niciunul, dacă serverul se oprește la jumătate.
+
+Rândul rezervării are un marcaj precum „confirmed: pending”, scris în aceeași tranzacție cu schimbarea de status. Funcția care trimite îl revendică printr-un update condiționat care înlocuiește „pending” cu „sending”. Trimite doar apelul care a modificat rândul.
+
+```ts
+// src/lib/payments.ts
+// Claim the send: only the call that swaps the marker sends, the other one leaves it alone.
+const { count } = await prisma.booking.updateMany({ where: { id: current.id, emailError: pendingMark(owed) }, data: { emailError: sendingMark(owed) } });
+if (count === 1) {
+  const kind = current.conflict ? "conflict" : "confirmed";
+  await sendBookingEmails(current, await tourTitle(current.tourSlug, current.locale), kind);
+}
+```
+
+Tot ce rămâne netrimis apare în panoul de administrare, cu un buton de retrimitere.
+
+### Teste care nu pot atinge rezervările reale
+
+Testele de integrare și cele end-to-end creează și șterg rezervări, deci nu au voie să ajungă niciodată la baza de date de producție. Un code review a găsit o configurație în care testele end-to-end puteau refolosi un server de dezvoltare conectat la ea.
+
+Acum o verificare de siguranță refuză orice host de bază de date în afară de localhost sau de un host de test numit explicit. Configurația Playwright o rulează înainte să pornească vreun server, apoi pornește propriul server de dezvoltare cu URL-ul verificat și refolosește unul deja pornit doar la cerere. În CI, ambele suite de teste rulează pe un service container cu Postgres 16.
+
+</Section>
+
+<Section id="results">
+
+- Trec 79 de teste unitare, 24 de integrare și 16 end-to-end, iar CI-ul e verde pe main (26 septembrie 2026).
+- Verificarea site-ului live: PASS, 0 erori pe 9 pagini (25 septembrie 2026).
+- Header-ul a fost verificat în 4 limbi, la câte 29 de lățimi fiecare (26 septembrie 2026).
+- Fotografii afișate mai mari decât fișierele lor: 16 din 99 înainte de remediere, 0 din 104 după (26 septembrie 2026).
+- Fonturile web au scăzut de la 481 KB la aproximativ 150 KB (26 septembrie 2026).
+
+</Section>
+
+<Section id="next">
+
+- Lansarea pe domeniul firmei, cu plăți reale cu cardul în propriul ei cont Stripe.
+- Redirecționarea URL-urilor vechi rămase, care încă duc la 404.
+- Urmărirea primelor rezervări reale și ajustarea regulilor de disponibilitate împreună cu firma.
+
+</Section>

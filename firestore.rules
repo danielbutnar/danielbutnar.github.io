@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Data model (see app/inquiry/schema.ts for the same limits on the client):
+//   inquiries/{id}  one message from the contact form
+//   senders/{uid}   when this browser last sent one (rate limit)
+//   notes/{id}      the owner's private note on inquiry {id}
+// Tests: tests/rules/*.test.ts, run against the emulator by `pnpm test:rules`.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The site owner: a verified Google account with this address.
+    // app/firebase/owner.ts holds the same address; a unit test keeps them equal.
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email == "daniel.butnar@gmail.com"
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == "google.com";
+    }
+
+    function isText(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    function inquiryFields() {
+      return ["kind", "name", "email", "company", "message", "timeline", "link",
+              "replyLang", "uid", "status", "createdAt", "expireAt"];
+    }
+
+    // Kept for a year, then removed by the TTL policy on `expireAt`
+    // (firestore.indexes.json). The client sets it from its own clock, so the
+    // rule accepts a day either way.
+    function expiresInAYear(value) {
+      return value is timestamp
+        && value > request.time + duration.value(364, "d")
+        && value < request.time + duration.value(366, "d");
+    }
+
+    function isValidNewInquiry(data) {
+      return data.keys().hasAll(inquiryFields())
+        && data.keys().hasOnly(inquiryFields())
+        && data.kind in ["project", "job", "other"]
+        && isText(data.name, 1, 100)
+        && isText(data.email, 6, 200)
+        && data.email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+        && isText(data.company, 0, 200)
+        && isText(data.message, 20, 2000)
+        && data.timeline in ["none", "month", "quarter", "later"]
+        && isText(data.link, 0, 500)
+        && (data.link == "" || data.link.matches("^https?://\\S+$"))
+        && data.replyLang in ["en", "de", "ro"]
+        && data.uid == request.auth.uid
+        && data.status == "new"
+        && data.createdAt == request.time
+        && expiresInAYear(data.expireAt);
+    }
+
+    match /inquiries/{id} {
+      // Written in one batch with senders/{uid}; getAfter() sees that batch.
+      allow create: if request.auth != null
+        && isValidNewInquiry(request.resource.data)
+        && getAfter(/databases/$(database)/documents/senders/$(request.auth.uid)).data.lastSentAt == request.time;
+
+      // The browser that sent an inquiry may read it back for the status page.
+      allow get: if request.auth != null
+        && (resource.data.uid == request.auth.uid || isOwner());
+
+      allow list, delete: if isOwner();
+
+      // The owner may only move it through its statuses.
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "readAt", "answeredAt"])
+        && request.resource.data.status in ["new", "read", "answered", "archived"]
+        && (!("readAt" in request.resource.data) || request.resource.data.readAt is timestamp)
+        && (!("answeredAt" in request.resource.data) || request.resource.data.answeredAt is timestamp);
+    }
+
+    match /senders/{uid} {
+      // One inquiry per browser per minute. Nobody reads these documents.
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["lastSentAt"])
+        && request.resource.data.lastSentAt == request.time;
+
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["lastSentAt"])
+        && request.resource.data.lastSentAt == request.time
+        && request.time > resource.data.lastSentAt + duration.value(60, "s");
+    }
+
+    match /notes/{id} {
+      allow read, delete: if isOwner();
+
+      // A note expires with its inquiry.
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasOnly(["text", "updatedAt", "expireAt"])
+        && isText(request.resource.data.text, 0, 5000)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.expireAt == get(/databases/$(database)/documents/inquiries/$(id)).data.expireAt;
+    }
+  }
+}

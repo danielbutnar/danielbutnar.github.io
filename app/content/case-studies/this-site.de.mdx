@@ -1,0 +1,96 @@
+<Section id="job">
+
+Ich bewerbe mich auf Stellen mit React und Firebase und übernehme kleine Projekte für Unternehmen. Ein Portfolio für beide muss den Stack beweisen, über den es spricht. Deshalb ist diese Website damit gebaut: React für jede Seite, Firebase für alles, was sich etwas merken muss.
+
+Zwei Gruppen lesen sie. Arbeitgeber wollen sehen, wie ich arbeite: Aufbau, Tests, Entscheidungen. Unternehmer wollen wissen, ob ich ihre Website bauen kann und wie sie mich erreichen. Die Website ist auf Englisch, Deutsch und Rumänisch und läuft auf GitHub Pages, das nur Dateien ausliefert. Es gibt also keinen eigenen Server: Die Security Rules sind das Backend.
+
+</Section>
+
+<Section id="built">
+
+Zuerst kam das Design, in Claude Design: drei Richtungen, dann jede Seite für Desktop und Handy, bevor eine Zeile Code entstand. Die gewählte Richtung, „Timetable“, nutzt schmale Schrift, eine Projektliste, die sich wie ein Fahrplan liest, und einen einzigen gelben Textmarker. Der Code entstand mit Claude Code. Ich prüfe, was live geht, und die Prüfungen unten laufen bei jeder Änderung.
+
+- Jede öffentliche Seite wird beim Build mit React Router 8 zu HTML vorgerendert: 30 Seiten, zehn pro Sprache, jede mit hreflang-Links und eigener Content Security Policy.
+- Ein Anfrageformular, das sich an das Thema anpasst (ein Projekt, eine Stelle, etwas anderes), jedes Feld beim Tippen prüft und die Anfrage in Cloud Firestore speichert.
+- Eine Statusseite, die sich live aktualisiert, wenn ich die Anfrage öffne und als beantwortet markiere.
+- Ein privater Posteingang unter /admin: Google-Anmeldung, nur für mich, eine Live-Liste mit Filtern, Status, privaten Notizen und Löschen.
+- 27 Tests der Security Rules gegen den Firestore-Emulator, 65 Unit-Tests und ein End-to-End-Test in Chrome gegen die Auth- und Firestore-Emulatoren. Die CI führt alle drei bei jedem Push aus.
+
+<Flow />
+
+<Shot name="this-site-inbox" kind="desktop" alt="Der private Posteingang: eine Liste mit zwei Beispielanfragen, eine davon geöffnet, mit privater Notiz und Knöpfen zum Antworten, Archivieren und Löschen." caption="Der Posteingang mit Beispieldaten aus den Emulatoren. Wer eine Anfrage öffnet, markiert sie als gelesen." />
+
+</Section>
+
+<Section id="hard">
+
+### Kein Server, und das Formular muss trotzdem sicher sein
+
+Jeder kann Firestore mit der öffentlichen Konfiguration der Website direkt aufrufen und mein Formular umgehen. Die Prüfungen im Formular sind also nur für Menschen da; was zählt, sind die Rules.
+
+Eine neue Anfrage muss genau die erwarteten Felder haben, jedes mit dem richtigen Typ und der richtigen Länge, eine gültige E-Mail-Adresse, den Status „new“, die eigene Nutzer-ID des Absenders und einen Zeitstempel, der der Serveruhr entspricht. Ich darf später drei Felder ändern und sonst nichts. Formular und Rules teilen sich ihre Grenzen: Die Tests der Rules importieren dasselbe `LIMITS`-Objekt wie das Formular und prüfen jede Grenze und ein Zeichen darüber. So können die beiden nicht auseinanderlaufen.
+
+```
+// firestore.rules
+function isValidNewInquiry(data) {
+  return data.keys().hasAll(inquiryFields())
+    && data.keys().hasOnly(inquiryFields())
+    && data.kind in ["project", "job", "other"]
+    && isText(data.name, 1, 100)
+    && isText(data.message, 20, 2000)
+    // …
+    && data.uid == request.auth.uid
+    && data.createdAt == request.time
+    && expiresInAYear(data.expireAt);
+}
+```
+
+### Eine Anfrage pro Minute, ohne Server
+
+Ein Formular ohne Rate Limit lädt ein Skript ein, tausend Nachrichten zu senden. Ohne Server gibt es keinen Ort, an dem man sie zählt. Firestore kann es aber.
+
+Wenn Sie auf Senden drücken, meldet Firebase Ihren Browser anonym an, damit er eine ID hat. Die Anfrage wird in einem Batch mit einem zweiten Dokument geschrieben, senders/Ihre-ID, das die Zeit Ihrer letzten Anfrage enthält. Die Regel für die Anfrage prüft mit `getAfter()`, dass derselbe Batch diese Zeit auf jetzt setzt. Die Regel für das senders-Dokument lehnt die Änderung ab, wenn die vorige Zeit weniger als 60 Sekunden zurückliegt. Beide Dokumente werden gespeichert oder keins.
+
+```
+// firestore.rules
+match /senders/{uid} {
+  allow update: if request.auth != null
+    && request.auth.uid == uid
+    && request.resource.data.keys().hasOnly(["lastSentAt"])
+    && request.resource.data.lastSentAt == request.time
+    && request.time > resource.data.lastSentAt + duration.value(60, "s");
+}
+```
+
+Das stoppt eine versehentliche Schleife, keinen entschlossenen Angreifer, der neue anonyme Nutzer anlegen kann. App Check wäre die nächste Schicht.
+
+<Shot name="this-site-status" kind="desktop" alt="Die Statusseite nach dem Senden: eingegangen, wartet auf das Lesen, dazu eine Kopie der gesendeten Angaben." caption="Die Statusseite. Nur der Browser, der die Anfrage gesendet hat, darf sie lesen." />
+
+### Firebase nur, wenn es gebraucht wird
+
+Das Firebase-SDK ist die größte Abhängigkeit der Website, und die meisten Besucher senden nie eine Anfrage. Deshalb importiert keine Seite es beim Laden. Das Formular lädt den Code für Firestore und Auth per dynamischem `import()`, wenn Sie auf Senden drücken, die Statusseite beim Öffnen.
+
+Die Startseite liefert etwa 130 KB JavaScript aus, komprimiert, und keinen Firebase-Code. Senden lädt etwa 155 KB nach. Der Posteingang, der die Google-Anmeldung braucht, ist eine eigene Route, die Besucher nie laden. Die Schriften liegen auf der Website selbst, und nur ihre lateinischen Teilmengen, die Englisch, Deutsch und Rumänisch abdecken.
+
+### Daten, die sich selbst löschen
+
+Die Datenschutzerklärung verspricht, dass eine Anfrage nach 12 Monaten gelöscht wird, und so ein Versprechen vergisst man leicht. Deshalb trägt jede Anfrage ein `expireAt`-Datum, und eine Time-to-live-Regel in Firestore löscht das Dokument, wenn das Datum erreicht ist. Der Browser setzt das Datum nach seiner eigenen Uhr, deshalb akzeptiert die Regel einen Tag Abweichung in jede Richtung. Meine privaten Notizen zu einer Anfrage übernehmen deren `expireAt`, und die Rules prüfen, dass beide übereinstimmen. So kann keine Notiz ihre Anfrage überleben.
+
+</Section>
+
+<Section id="results">
+
+- 27 Tests der Security Rules bestehen gegen den Firestore-Emulator, dazu 65 Unit-Tests (27. September 2026).
+- Der End-to-End-Test besteht alle 12 Prüfungen: Senden, Validierung, das Rate Limit, ein fremder Browser ohne Zugriff, die Anmeldung des Inhabers und die Statusseite, die sich live ändert (27. September 2026).
+- 30 vorgerenderte Seiten in drei Sprachen, ohne horizontales Scrollen bei 375 px und ohne Konsolenfehler.
+- Startseite: etwa 130 KB JavaScript, komprimiert, ohne Firebase-Code.
+
+</Section>
+
+<Section id="next">
+
+- App Check mit reCAPTCHA Enterprise einführen, damit nur diese Website in Firestore schreiben kann.
+- Mir für jede neue Anfrage eine E-Mail schicken. Dafür braucht es eine Cloud Function und damit den kostenpflichtigen Blaze-Tarif.
+- Anfragen mit Firestore Lite senden, das deutlich kleiner ist, und das volle SDK nur auf den Seiten laden, die sich live aktualisieren.
+
+</Section>

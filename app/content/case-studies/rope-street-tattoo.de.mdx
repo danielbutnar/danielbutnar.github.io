@@ -1,0 +1,86 @@
+<Section id="job">
+
+Bei der Contra × Lovable Challenge sollten die Teilnehmer aus „Kann ich bei dir buchen?“ ein „Du bist gebucht“ machen. Den Kunden habe ich erfunden und das Briefing selbst geschrieben: Rope Street Tattoo, ein Studio mit einem Stuhl in der Altstadt von Brașov, in dem Mara als einzige Tätowiererin alles selbst macht.
+
+Laut Briefing trägt sie sechs bis sieben Stunden am Tag Handschuhe, also bleiben Nachrichten bis nachts liegen. Jedes Angebot braucht Größe, Körperstelle, Farbe und ein Referenzbild. Sitzungen dauern 45 Minuten bis 5 Stunden, feste Einstundentermine funktionieren also nicht. Cover-ups, Hände, Hals und Gesicht dürfen nie automatisch gebucht werden. Etwa ein Drittel der Kunden sind Touristen, die auf Englisch, Deutsch oder Rumänisch schreiben und zwei oder drei Tage bleiben.
+
+</Section>
+
+<Section id="built">
+
+Ich habe das Briefing geschrieben, die Regeln des Studios, zwölf Prompts und zu jedem eine Prüfung. Lovable hat daraus die App generiert. Die Werkzeuge, die das Demovideo filmen und vertonen, sind mein eigener Code.
+
+- Eine Eingangstür: Die Idee in eigenen Worten und in der eigenen Sprache beschreiben und dann Dauer, Preisspanne, Anzahlung und nur die Termine bekommen, die zum Tattoo passen.
+- Eine Anzahlung über Stripe im Testmodus. Sobald sie bezahlt ist, wird aus der gestrichelten violetten Buchungskarte im „Stencil“-Look durchgehende Tinte.
+- Eine private Seite pro Buchung zum Bestätigen, Verschieben, Stornieren, Eintragen in den Kalender und Unterschreiben der Einverständniserklärung, ohne Konto.
+- Ein Bereich für die Inhaberin mit Today, Week und der Warteschlange „Needs you“, in der aus einer eingefügten DM eine Antwort mit Preis in der Sprache des Kunden wird.
+- Ein Autopilot für Bestätigungen, Erinnerungen, Freigaben, Nachbesetzung von der Warteliste und Nachsorge, mit einer Demo-Uhr zum Vorspulen.
+
+<Shot name="rope-street-tattoo-price" kind="desktop" alt="Die Schätzung für eine deutsche Nachricht: eine Sitzung von 90 Minuten, 450 bis 600 Lei und 150 Lei Anzahlung." caption="Die KI füllt die Felder aus, der Preis kommt aus den Regeln des Studios." />
+
+</Section>
+
+<Section id="hard">
+
+### Die KI liest, die Regeln entscheiden
+
+Ein Preis von einem Chatbot ist geraten. Bei einem Tattoo heißt falsch geraten: ein verärgerter Kunde oder ein verlorener Tagesverdienst.
+
+Deshalb liest die KI nur. Per Tool Calling liefert sie Felder zurück: Sprache, Körperstelle, Größe, Farbe, Detailgrad, Cover-up oder nicht, Aufenthaltstage in der Stadt und einen Konfidenzwert. Deterministischer Servercode macht aus diesen Feldern Zahlen, nach Regeln, die Mara selbst ändern kann: eine Größentabelle von 45 Minuten bis 4 Stunden, Zusatzzeit für Farbe, feine Details und schwierigere Stellen, Aufrunden auf volle 15 Minuten, 350 Lei pro Stunde und eine Spanne vom 0,9- bis 1,15-Fachen des erwarteten Preises. Cover-ups, Hände, Finger, Hals, Gesicht, alles über 25 cm oder eine Konfidenz unter 0,6 gehen an Mara.
+
+Die deutsche Testnachricht fragt nach einer 6 cm großen schwarzen Linienzeichnung am Knöchel. Die Regeln machen daraus 75 Minuten plus 15 % für den Knöchel, aufgerundet auf 90: 450 bis 600 Lei, mit 150 Lei Anzahlung. Jede Änderung an einem Feld rechnet sofort neu, ohne zweiten KI-Aufruf.
+
+### Eine Woche Follow-up in zwei Klicks
+
+Die Jury kann nicht drei Tage warten, um zu sehen, wie eine Erinnerung rausgeht.
+
+Jede Serverfunktion fragt eine einzige Uhr nach der Zeit, und im Demomodus ist diese Uhr ein gespeicherter Zeitstempel. Ein Runner arbeitet der Reihe nach alles ab, was zwischen seinem letzten Lauf und der neuen Zeit fällig ist: 72 Stunden vor einer Sitzung eine Bitte um Bestätigung, 48 Stunden vorher eine zweite Erinnerung, und 24 Stunden vorher wird ein unbestätigter Termin freigegeben, die Anzahlung einbehalten und der Termin den drei am besten passenden Einträgen auf der Warteliste angeboten. Jede Aktion hat einen Deduplizierungsschlüssel, und Nachrichten sind pro Buchung und Art eindeutig, sodass ein zweiter Lauf über dasselbe Zeitfenster nichts Neues verschickt.
+
+In meinen Tests auf der Live-Website hat „+1 day“ Ioanas unbestätigten Mittwoch freigegeben und ihn Sam angeboten, nicht Bianca, die nur Samstage möchte. Sam hat bezahlt, und der Mittwoch war wieder belegt.
+
+### Prompts mit eingebautem Test
+
+Ein App-Builder meldet gern, ein Feature sei fertig. Ich brauchte eine Möglichkeit, das zu überprüfen.
+
+Jeder der 12 Prompts endet mit einer „Done when“-Zeile, die genaue Eingaben und Ergebnisse nennt. Für die Eingangstür musste die deutsche Nachricht eine deutsche Zusammenfassung ergeben, 1 h 30 min, 450 bis 600 Lei und Termine nur von Dienstag, 29. September, bis Samstag, 3. Oktober: Die Demo-Uhr steht auf Montag, das Studio tätowiert dienstags bis samstags, und wer schreibt, reist am Sonntag ab. Nach jedem Prompt habe ich die Vorschau geprüft und für alles, was nicht klappte, Fix-Prompts geschrieben, etwa für einen Demo-Reset, den ein Fremdschlüssel blockierte, oder einen Link aus einer eingefügten DM, der einen leeren Schritt öffnete.
+
+### Eine Demo filmen, ohne eine Karte zu filmen
+
+Das Demovideo brauchte eine Sprecherstimme, die zum Bild passt, und echte Testzahlungen, ohne den bei Stripe eingetippten Namen des Karteninhabers zu zeigen.
+
+Ein Python-Skript spricht jede Zeile des Sprechertexts mit Kokoro ein, einem Text-to-Speech-Modell mit offenen Gewichten, und notiert ihre Länge. Dann steuert ein Playwright-Skript die Live-Website und nimmt Frames über das Chrome DevTools Protocol auf. Vor jeder neuen Zeile wartet es, bis die vorherige zu Ende ist, sodass die Stimme das Tempo vorgibt.
+
+```js
+// video/film.mjs
+async function say(id, vars = {}) {
+  if (!(id in SPOKEN)) throw new Error(`no voice line "${id}": run voice.py first`);
+  await done();
+  if (speakingUntil) await wait(PAUSE * 1000);
+  const text = NARRATION[id].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
+  markers.push({ type: "say", id, t: now(), text });
+  speakingUntil = now() + SPOKEN[id];
+  log(`say ${id} (${SPOKEN[id]} s)`);
+}
+```
+
+Auf jeder Stripe-Seite pausiert die Aufnahme, bis die Zahlung durch ist. Ein Build-Skript schneidet diese Lücken heraus, kürzt Ladezeiten und das Warten auf die KI und kodiert das Ergebnis mit ffmpeg.
+
+</Section>
+
+<Section id="results">
+
+- Am 27. September 2026 auf Contra eingereicht.
+- Site-Check der Live-Website: PASS, 0 Fehler auf 13 Seiten; kein horizontaler Überlauf bei 375, 768 oder 1440 px (27. September 2026).
+- Ein kompletter Probedurchlauf auf der Live-Website hat funktioniert, inklusive beider Testzahlungen (27. September 2026).
+- Die Historie der App reicht am 27. September 2026 von 00:54 bis 16:15 Uhr: 224 Commits, 163 von 200 Lovable-Credits.
+- Die Zahlen im Demo-Dashboard stammen aus vorab angelegten Demodaten für ein fiktives Studio. Sie zeigen, wie gezählt wird, keine echten Ergebnisse.
+
+</Section>
+
+<Section id="next">
+
+- Echte Nachrichten verschicken. Bisher landet jede Nachricht in einem Postausgang, und WhatsApp und SMS sind als simuliert gekennzeichnet.
+- Auf der Live-Website die zwei Fixes bestätigen, die ich nicht selbst in Aktion sehen konnte: den Hinweis zur Warteliste auf einer bezahlten Buchungsseite und das automatische Zurücksetzen der gemeinsam genutzten Demo.
+- Das Lovable-Badge verschieben, das bei 375 px das Textfeld auf der Startseite verdeckt.
+
+</Section>

@@ -1,0 +1,93 @@
+<Section id="job">
+
+Ursa is a fictional stone refuge at 1,842 m in the Făgăraș Mountains, with twelve bunks and a four-hour walk in. I made it as a portfolio piece to show how much a small hospitality site can carry without stock photos.
+
+A refuge four hours from the road sells two things, the walk up and the night at the top, so the page follows that order. It opens on a hiking map at the car park, climbs through the forest, stops at the refuge's floor plan, and ends in the night sky above the ridge, where the booking form is. The site had to stay light and private: no framework, no cookies, no third-party requests.
+
+</Section>
+
+<Section id="built">
+
+One long page in plain HTML, CSS and JavaScript, plus a colophon that explains how it was made. Every picture on it is drawn from data.
+
+- A hero map of a generated mountain with hillshade, forest, contour lines, a stream and three waymarked routes. Point at it to read the height and the ground below.
+- An altimeter and elevation profile that follow your reading position, as a sticky strip on phones.
+- An SVG floor plan: point at a room in the list and it lights up on the plan.
+- A night sky with seeded stars, the Milky Way and the Plough, plus tonight's sunset, darkness and moon phase for the refuge.
+- A booking calendar built from radio buttons, with the twelve bunks drawn for each night and a live total. Arrow keys move between nights and skip full ones. It runs in concept mode and sends nothing.
+- A dark mode that turns the map into a night map.
+
+<Shot name="ursa-night" kind="desktop" alt="The night sky section: seeded stars, the Plough and a card with tonight's sunset and moon phase." caption="The night sky is computed for the refuge's position and altitude." />
+
+</Section>
+
+<Section id="hard">
+
+### The same mountain on every visit
+
+A random mountain would look different on every visit, and the page quotes its heights and distances.
+
+The map starts from a seeded random number generator (seed 1842), which shuffles the table behind simplex noise. Layered noise gives the rough ground. On top of it, the code shapes the landscape: a ridge line, a glacial valley with a cirque at its head, a long spur and a summit. Then it rescales every height so the refuge sits at exactly 1,842 m, and flattens a small bench under the hut.
+
+```js
+// assets/js/terrain.js
+const K = (REFUGE_H - FLOOR) / (raw(0, 0) - FLOOR);
+function height(x, y) {
+  let h = FLOOR + (raw(x, y) - FLOOR) * K;
+  h += (REFUGE_H - h) * 0.75 * Math.exp(-(x * x + y * y) / 0.045); // the bench the refuge sits on
+  const low = FLOOR + 30;
+  return h < low ? low - (low - h) * 0.15 : h;
+}
+```
+
+Because the terrain is fixed, its numbers are too. One map unit is set to 1.72 km, which makes the red route 7.4 km. The climbs, the other two routes and the summit height of 2,236 m were then read off the generated map and written into the copy.
+
+### Paths that switchback like real ones
+
+A straight line from the car park to the refuge would run straight up the slope. Real paths zigzag.
+
+The routes are found with A* search over a grid of 223 by 214 heights. Each step can go in 16 directions, including knight's moves, so paths are not limited to 45° angles. A step costs its length times one plus a penalty for its gradient. On the easy routes the penalty grows gently, then sharply above a 26 % grade, so the search prefers a longer path to a steep one.
+
+```js
+// assets/js/terrain.js
+const run = Math.hypot(dx, dy) * step;
+const grade = Math.abs(h[m] - h[n]) / (run * 1000);
+const c = cost[n] + run * (1 + penalty(grade));
+// …
+const easy = (g) => 9 * g * g + (g > 0.26 ? 380 * (g - 0.26) ** 2 : 0);
+```
+
+The raw grid path is then thinned with the Douglas–Peucker algorithm, which drops the grid's stair-steps but keeps the turns, and smoothed with three rounds of Chaikin's corner cutting.
+
+<Shot name="ursa-routes" kind="desktop" alt="Three waymarked routes with their elevation profiles on one scale." caption="Three routes found by A* search, with profiles read off the terrain." />
+
+### Heavy maths without freezing the page
+
+Hillshade and contours for a full-screen map take real work, and all of it runs on the visitor's device.
+
+terrain.js runs twice: as the page script that draws, and as a Web Worker, loaded from the same URL, that does the maths. The worker builds the terrain once, then answers each view request with hillshade pixels and contour segments traced by marching squares, sent back as transferable buffers so nothing is copied. If workers are unavailable, the page does the work itself. The map's colours come from CSS custom properties, so dark mode lives in the stylesheet. With reduced motion turned on, the finished map appears at once instead of rising contour by contour.
+
+### A sky for tonight, worked out in the browser
+
+The "Tonight above Ursa" card shows today's sunset, the end of astronomical twilight and the moon's phase at the refuge.
+
+The page computes the sun's position with the standard low-precision method used by NOAA and SunCalc, good to a minute or two. It also lowers the horizon for the refuge's altitude, because from 1,842 m you see the sun set a little later than from the valley. The moon's phase comes from the length of the synodic month, counted from a known new moon. The star canvas is built only when the section comes near. Only the brighter stars twinkle, and only while the section is on screen. A button pauses them, and reduced motion never starts them.
+
+</Section>
+
+<Section id="results">
+
+- The three routes, as read off the terrain: red 7.4 km with 1,202 m of climbing, blue 8.0 km with 1,127 m, yellow 4.0 km with 394 m. Summit 2,236 m.
+- All three scripts together are 63,532 bytes before compression, with no libraries (measured 27 September 2026).
+- Four pages with no runtime dependencies, cookies, analytics or third-party requests. A Content Security Policy on every page allows one inline script, by its hash.
+- Since 23 September 2026, every push to main runs the shared site check in CI.
+
+</Section>
+
+<Section id="next">
+
+- Connect the booking form to a real form service. The config has a slot for it, and its origin must then be added to the Content Security Policy.
+- Keep the copy in step with the terrain: if the terrain code changes, the heights, route figures and profiles have to be read off again.
+- Record a dated Lighthouse and axe result in the repository. The CI check runs, but no result is written down yet.
+
+</Section>

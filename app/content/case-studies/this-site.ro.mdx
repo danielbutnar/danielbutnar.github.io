@@ -1,0 +1,96 @@
+<Section id="job">
+
+Aplic la posturi cu React și Firebase și iau proiecte mici pentru firme. Un portofoliu pentru amândouă trebuie să dovedească stack-ul despre care vorbește, așa că acest site e construit pe el: React pentru fiecare pagină, Firebase pentru tot ce trebuie să țină minte ceva.
+
+Îl citesc două grupuri. Angajatorii vor să vadă cum lucrez: structura, testele, deciziile. Proprietarii de firme vor să știe dacă le pot construi site-ul și cum mă contactează. Site-ul e în engleză, germană și română și rulează pe GitHub Pages, care servește doar fișiere. Deci nu am un server al meu: regulile de securitate sunt backend-ul.
+
+</Section>
+
+<Section id="built">
+
+Întâi a venit designul, în Claude Design: trei direcții, apoi fiecare pagină pentru desktop și telefon, înainte de orice linie de cod. Direcția aleasă, „Timetable”, folosește litere înguste, o listă de proiecte care se citește ca un mers al trenurilor și un singur marker galben. Codul a fost scris cu Claude Code. Eu verific ce ajunge online, iar verificările de mai jos rulează la fiecare schimbare.
+
+- Fiecare pagină publică este prerandată în HTML la build cu React Router 8: 30 de pagini, zece în fiecare limbă, fiecare cu linkuri hreflang și propria Content Security Policy.
+- Un formular de cerere care se schimbă după subiect (un proiect, un post, altceva), verifică fiecare câmp pe măsură ce scrieți și salvează cererea în Cloud Firestore.
+- O pagină de status care se actualizează live când deschid cererea și când o marchez ca răspunsă.
+- O căsuță privată la /admin: autentificare Google, doar pentru mine, o listă live cu filtre, statusuri, notițe private și ștergere.
+- 27 de teste pentru regulile de securitate pe emulatorul Firestore, 65 de teste unitare și un test end-to-end în Chrome pe emulatoarele Auth și Firestore. CI-ul le rulează pe toate trei la fiecare push.
+
+<Flow />
+
+<Shot name="this-site-inbox" kind="desktop" alt="Căsuța privată: o listă cu două cereri de probă, una deschisă, cu o notiță privată și butoane pentru răspuns, arhivare și ștergere." caption="Căsuța cu date de probă din emulatoare. Când deschid o cerere, ea devine citită." />
+
+</Section>
+
+<Section id="hard">
+
+### Fără server, iar formularul tot trebuie să fie sigur
+
+Oricine poate apela Firestore direct cu configurația publică a site-ului, ocolind formularul. Așa că verificările din formular sunt doar pentru oameni; ce contează sunt regulile.
+
+O cerere nouă trebuie să aibă exact câmpurile așteptate, fiecare cu tipul și lungimea corecte, o adresă de e-mail validă, statusul „new”, ID-ul propriu al expeditorului și o oră de creare egală cu ceasul serverului. Eu pot schimba ulterior trei câmpuri și nimic altceva. Formularul și regulile împart aceleași limite: testele regulilor importă același obiect `LIMITS` ca formularul și verifică fiecare limită și un caracter peste ea, ca cele două să nu se poată despărți.
+
+```
+// firestore.rules
+function isValidNewInquiry(data) {
+  return data.keys().hasAll(inquiryFields())
+    && data.keys().hasOnly(inquiryFields())
+    && data.kind in ["project", "job", "other"]
+    && isText(data.name, 1, 100)
+    && isText(data.message, 20, 2000)
+    // …
+    && data.uid == request.auth.uid
+    && data.createdAt == request.time
+    && expiresInAYear(data.expireAt);
+}
+```
+
+### O cerere pe minut, fără server
+
+Un formular fără limită de trimitere invită un script care trimite o mie de mesaje. Fără server nu ai unde să le numeri. Firestore însă poate.
+
+Când apăsați Trimite, Firebase autentifică browserul anonim, ca să aibă un ID. Cererea se scrie într-un singur lot cu un al doilea document, senders/ID-ul-dumneavoastră, care păstrează ora ultimei cereri. Regula pentru cerere verifică cu `getAfter()` că același lot pune ora pe acum. Regula pentru documentul senders refuză schimbarea dacă ora anterioară e mai recentă de 60 de secunde. Se salvează amândouă documentele sau niciunul.
+
+```
+// firestore.rules
+match /senders/{uid} {
+  allow update: if request.auth != null
+    && request.auth.uid == uid
+    && request.resource.data.keys().hasOnly(["lastSentAt"])
+    && request.resource.data.lastSentAt == request.time
+    && request.time > resource.data.lastSentAt + duration.value(60, "s");
+}
+```
+
+Asta oprește o buclă scăpată din greșeală, nu un atacator hotărât, care poate crea utilizatori anonimi noi. App Check ar fi următorul strat.
+
+<Shot name="this-site-status" kind="desktop" alt="Pagina de status după trimitere: primită, așteaptă să fie citită, plus o copie a ce s-a trimis." caption="Pagina de status. Doar browserul care a trimis cererea o poate citi." />
+
+### Firebase doar când e nevoie
+
+SDK-ul Firebase e cea mai mare dependență a site-ului, iar majoritatea vizitatorilor nu trimit niciodată o cerere. Așa că nicio pagină nu îl importă la încărcare. Formularul încarcă codul pentru Firestore și Auth cu un `import()` dinamic când apăsați Trimite, iar pagina de status când se deschide.
+
+Pagina principală livrează circa 130 KB de JavaScript, comprimat, și niciun cod Firebase. Trimiterea mai adaugă circa 155 KB. Căsuța, care are nevoie de autentificarea Google, e o rută separată pe care vizitatorii nu o încarcă niciodată. Fonturile sunt găzduite pe site, doar subseturile latine, care acoperă engleza, germana și româna.
+
+### Date care se șterg singure
+
+Politica de confidențialitate promite că o cerere se șterge după 12 luni, iar o asemenea promisiune se uită ușor. Așa că fiecare cerere are o dată `expireAt`, iar o regulă time-to-live din Firestore șterge documentul când data trece. Browserul pune data după propriul ceas, deci regula acceptă o zi abatere în orice sens. Notițele mele private despre o cerere preiau `expireAt` al ei, iar regulile verifică să coincidă, ca nicio notiță să nu trăiască mai mult decât cererea.
+
+</Section>
+
+<Section id="results">
+
+- 27 de teste pentru regulile de securitate trec pe emulatorul Firestore, plus 65 de teste unitare (27 septembrie 2026).
+- Testul end-to-end trece toate cele 12 verificări: trimiterea, validarea, limita de trimitere, un browser străin refuzat, autentificarea proprietarului și pagina de status care se schimbă live (27 septembrie 2026).
+- 30 de pagini prerandate în trei limbi, fără derulare orizontală la 375 px și fără erori în consolă.
+- Pagina principală: circa 130 KB de JavaScript, comprimat, fără cod Firebase.
+
+</Section>
+
+<Section id="next">
+
+- App Check cu reCAPTCHA Enterprise, ca doar acest site să poată scrie în Firestore.
+- Un e-mail către mine pentru fiecare cerere nouă. Pentru asta e nevoie de o Cloud Function, deci de planul plătit Blaze.
+- Trimiterea cererilor cu Firestore Lite, mult mai mic, și SDK-ul complet doar pe paginile care se actualizează live.
+
+</Section>
