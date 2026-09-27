@@ -42,7 +42,7 @@ From Claude Design, direction "Timetable" (canvas "Daniel Butnar portfolio", pag
   entity; publish nothing about unfinished security or hosting settings of the client.
 - Accessibility study: never name an audited shop; link the study page, not the offer page with prices.
 - AI use is stated plainly (Claude Design, Claude Code); the owner reviews what ships.
-- Prices, offers and business direction are decided in `code/danielbutnar2003/business-hq`, not here.
+- Prices, offers and business direction are not decided in this repo: the site names no prices.
 - DE/RO copy are drafts for Daniel's review. German uses "Sie"; Romanian uses ș ț with comma below.
   `app/i18n/dictionaries.test.ts` and `app/content/content.test.ts` enforce shape, sections and assets.
 
