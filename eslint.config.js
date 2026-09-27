@@ -23,7 +23,7 @@ export default defineConfig([
   },
   {
     // page.evaluate() callbacks run in the browser.
-    files: ["scripts/og.mjs", "scripts/screenshots.mjs", "tests/e2e/**/*.mjs"],
+    files: ["scripts/og.mjs", "scripts/screenshots.mjs", "scripts/contra-shots.mjs", "tests/e2e/**/*.mjs"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 ]);
