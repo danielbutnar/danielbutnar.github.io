@@ -5,6 +5,6 @@ export const CONTACT = {
   email: OWNER_EMAIL,
   github: "https://github.com/danielbutnar",
   linkedin: "https://www.linkedin.com/in/daniel-butnar",
-  contra: null as string | null,
+  contra: "https://contra.com/daniel_butnar_1c9hjb9c" as string | null,
   repo: "https://github.com/danielbutnar/danielbutnar.github.io",
 };
