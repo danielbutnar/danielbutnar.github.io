@@ -52,6 +52,10 @@ From Claude Design, direction "Timetable" (canvas "Daniel Butnar portfolio", pag
   indexes deploy with `npx firebase deploy --only firestore --project <id>`. The project is on the
   free Spark plan (owner's choice, 2026-09-27): no TTL policy, so `/admin` deletes inquiries and
   notes past `expireAt` when it opens.
+- The web API key in `web-config.json` is public by design. It is restricted in Google Cloud to
+  `https://danielbutnar.github.io/*` and `https://danielbutnar-portfolio.firebaseapp.com/*` (the
+  latter is needed for Google sign-in). GitHub secret scanning alert #1 was closed as "won't fix"
+  (2026-09-27). Do not rotate it to silence scanners: a new key is just as public.
 - Owner = `OWNER_EMAIL` in `app/firebase/owner.ts`, the same address in `firestore.rules`
   (a unit test keeps them equal). Verified Google sign-in only.
 - Limits live in `app/inquiry/schema.ts`; the rules tests import them. Change both files together.
