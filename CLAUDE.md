@@ -65,4 +65,7 @@ From Claude Design, direction "Timetable" (canvas "Daniel Butnar portfolio", pag
 - GNU sed turns `\u` in a replacement into "uppercase next character": edit escapes with Node or the editor.
 - Case studies load lazily but must be complete in the prerendered HTML: the case study `loader`
   loads the MDX first, and `entry.server.tsx` renders with `onAllReady` and `progressiveChunkSize: Infinity`.
+- A `clientLoader` must not call `serverLoader()`: for trailing-slash URLs React Router fetches
+  `<path>/_.data`, which the prerender does not write, so GitHub Pages answers 404 and the page
+  shows "Page not found". The end-to-end test clicks into case studies to catch this.
 - pnpm build scripts: `pnpm-workspace.yaml` keeps the Firebase and sharp postinstall scripts off.
